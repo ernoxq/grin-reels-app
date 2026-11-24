@@ -68,7 +68,7 @@ def _final_encoder(quality: str) -> list[str]:
     if IS_MAC:  # Apple Silicon hardware HEVC, ~45 Mbit/s like CapCut's "Higher"
         return ["-c:v", "hevc_videotoolbox", "-b:v", "18M", "-maxrate", "24M", "-tag:v", "hvc1", "-pix_fmt", "yuv420p"]
     # smooth playback in phone players / chat previews; still far above what Instagram keeps (~3-5 Mbit/s)
-    return ["-c:v", "libx264", "-preset", "medium", "-crf", "18", "-maxrate", "14M", "-bufsize", "28M",
+    return ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-maxrate", "14M", "-bufsize", "28M",
             "-profile:v", "high", "-level", "4.2", "-pix_fmt", "yuv420p"]
 
 

@@ -9,6 +9,7 @@ Results are cached next to the job as words.json, so re-runs cost nothing.
 from __future__ import annotations
 
 import json
+import os
 from dataclasses import asdict, dataclass
 from pathlib import Path
 
@@ -27,14 +28,15 @@ def transcribe(path: str, cache: Path, model_size: str = "small", language: str 
 
     from faster_whisper import WhisperModel  # imported lazily: not needed for silence-only runs
 
-    model = WhisperModel(model_size, device="cpu", compute_type="int8", cpu_threads=4)
-    segments, _info = model.transcribe(path, language=language, word_timestamps=True,
+    model = WhisperModel(model_size, device="cpu", compute_type="int8", cpu_threads=os.cpu_count() or 4)
+    segments, info = model.transcribe(path, language=language, word_timestamps=True,
                                        vad_filter=True, beam_size=1)
     words: list[Word] = []
     for seg in segments:  # generator: segments are decoded lazily, memory stays flat
         for w in seg.words or []:
             words.append(Word(w.word.strip(), float(w.start), float(w.end), float(w.probability)))
     del model
+    cache.with_name("lang.txt").write_text(info.language or "")
     cache.write_text(json.dumps([asdict(w) for w in words], ensure_ascii=False))
     return words
 

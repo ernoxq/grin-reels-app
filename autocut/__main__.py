@@ -50,6 +50,19 @@ def main() -> None:
     rl.add_argument("--model", help='speech model name or folder; "cloud" = download from the GRIN GitHub release')
     rl.add_argument("--plan-only", action="store_true", help="only write spec.json (edit it, then `render`)")
     rl.add_argument("--quality", default="high", choices=["high", "prores"])
+    rl.add_argument("--lang", help="speech language (ro, ru, en...); default: detect automatically")
+
+    au = sub.add_parser("auto", help="ALL files from the chat -> one finished reel (joins every talking part)")
+    au.add_argument("files", type=Path, nargs="+")
+    au.add_argument("--talking", nargs="*", help="names of the clips where the person talks (default: detect)")
+    au.add_argument("--style", type=Path, default=ROOT / "styles/warm_intro.json")
+    au.add_argument("--script", type=Path)
+    au.add_argument("--title")
+    au.add_argument("--lang")
+    au.add_argument("--model", default="cloud")
+    au.add_argument("--out", type=Path)
+    au.add_argument("--all-talking", action="store_true", help="every video is a part of the talk, join them all")
+    au.add_argument("--no-inserts", action="store_true", help="talking parts only, no B-roll")
 
     rd = sub.add_parser("render", help="render a reel spec.json (after hand edits)")
     rd.add_argument("spec", type=Path)
@@ -114,7 +127,7 @@ def main() -> None:
         spec_path = run(str(a.aroll), [str(b) for b in a.broll], str(a.style), str(out),
                         script=str(a.script) if a.script else None, title=a.title,
                         words_json=str(a.words) if a.words else None, lite=a.lite,
-                        model=a.model)
+                        model=a.model, language=a.lang)
         res = {"spec": str(spec_path)}
         if not a.plan_only:
             spec = load_spec(spec_path)
@@ -125,6 +138,31 @@ def main() -> None:
             res.update(duration=s["duration"], cuts=len(s["voice"]), broll=len(s["broll"]),
                        captions=len(s["captions"]))
         print(json.dumps(res, ensure_ascii=False))
+    elif a.cmd == "auto":
+        import time
+        from .autoreel import run
+        from .prep import join, sort_files
+        from .reel import load_spec, render_reel
+        t0 = time.time()
+        srt = sort_files([str(f) for f in a.files], a.talking, a.all_talking)
+        if not srt["story"]:
+            print(json.dumps({"error": "нет видео, где человек говорит"}, ensure_ascii=False)); raise SystemExit(1)
+        if not a.out:
+            a.out = ROOT / "jobs" / time.strftime("reel_%H%M%S")
+        a.out = a.out.resolve()
+        a.out.mkdir(parents=True, exist_ok=True)
+        main = join(srt["story"], a.out / "story.mp4")
+        model = a.model
+        if model == "cloud":
+            from .fetch_model import fetch
+            model = str(fetch())
+        spec_path = run(str(main), [] if a.no_inserts else srt["inserts"], str(a.style), str(a.out),
+                        script=str(a.script) if a.script else None, title=a.title, model=model, language=a.lang)
+        video = render_reel(load_spec(spec_path), a.out / "final.mp4")
+        s = json.loads(spec_path.read_text())
+        print(json.dumps({"video": str(Path(video).resolve()), "sec": round(s["duration"], 1), "parts": [Path(x).name for x in srt["story"]],
+                          "inserts": len(s["broll"]), "unused": len(srt["inserts"]) - len({b["src"] for b in s["broll"]}), "lang": s.get("lang"), "took_s": round(time.time() - t0)},
+                         ensure_ascii=False))
     elif a.cmd == "render":
         from .reel import capcut_reel, load_spec, render_reel
         spec = load_spec(a.spec)

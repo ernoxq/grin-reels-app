@@ -84,5 +84,5 @@ echo
 echo "Готово! Как пользоваться:"
 echo "  ПРОЩЕ ВСЕГО: открой приложение «GRIN Reels» (Launchpad или папка Программы в твоей домашней папке)."
 open "$APP" || true
-echo "  ЧЕРЕЗ CLAUDE: Claude → Customize → Skills → + → Upload a skill → skills/grin-reel-auto-edit.zip,"
+echo "  ЧЕРЕЗ CLAUDE: Claude (Code) → Plugins → Skills → Add → Upload plugin → grin-reel-auto-edit.zip,"
 echo "                потом в приложении Claude на Mac: + → Add folder → $DIR, и напиши «Собери рилс из папки …»"

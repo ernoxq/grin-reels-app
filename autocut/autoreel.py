@@ -222,27 +222,34 @@ def _wrap(text: str, max_line: int) -> str:
 
 # ------------------------------------------------------------------ B-roll
 def plan_broll(sentences: list[tuple[float, float]], clips: list[dict], style: dict, total: float) -> list[dict]:
+    """Inserts go on every other sentence, never on the first (title) or the last (end button) one.
+    With fewer clips than slots they are spread evenly over the whole video, not bunched at the start."""
     r = style["broll_rules"]
-    lo, hi = r.get("window", [0.08, 0.68])
+    lo, hi = r.get("window", [0.06, 0.95])
     beat = r.get("cut_len") or 60.0 / style.get("music", {}).get("bpm", 120) * r.get("beats_per_cut", 2)
-    out, ci, use_b = [], 0, True  # first sentence after the title stays on the face
-    for k, (s, e) in enumerate(sentences):
-        if k == 0:  # title sentence stays on the face
-            continue
-        use_b = not use_b
-        if not use_b or s < lo * total or e > hi * total or ci >= len(clips):
-            continue
+    last = sentences[-1][0] if len(sentences) > 2 else total
+    slots = [(s, e) for k, (s, e) in enumerate(sentences)
+             if 0 < k < len(sentences) - 1 and k % 2 == 1 and s >= lo * total and e <= min(hi * total, last)]
+    if not clips or not slots:
+        return []
+    if len(clips) < len(slots):  # spread evenly
+        step = len(slots) / len(clips)
+        slots = [slots[int(i * step + step / 2)] for i in range(len(clips))]
+    out, ci = [], 0
+    for s, e in slots:
+        if ci >= len(clips):
+            break
         span = e - s
-        if span < r.get("montage_min", 3.0):  # single insert
+        left = len(clips) - ci
+        if span < r.get("montage_min", 3.0) or left < 2:  # single insert (long sentence: first part only)
             c = clips[ci]; ci += 1
-            out.append(_ins(c, s, span, 1.0, "color", r))
-        else:  # montage on the beat grid
-            n = max(1, int(span // beat))
+            out.append(_ins(c, s, min(span, r.get("max_insert", 4.0)), 1.0, "color", r))
+        else:  # montage on the beat grid, but leave clips for the slots still ahead
+            ahead = len([x for x in slots if x[0] > s])
+            n = max(1, min(int(span // beat), left - ahead))
             t, looks = s, r.get("looks", ["color", "bw"])
             for m in range(n):
-                if ci >= len(clips):
-                    break
-                d = beat if m < n - 1 else e - t
+                d = beat if m < n - 1 else min(e - t, r.get("max_insert", 4.0))
                 c = clips[ci]; ci += 1
                 sp = r.get("slowmo", 0.8) if c["fps"] >= 50 else 1.0
                 out.append(_ins(c, t, d, sp, looks[m % 2], r))
@@ -392,6 +399,8 @@ def run(aroll: str, broll: list[str], style_path: str, out_dir: str, script: str
                 from .fetch_model import fetch
                 words = transcribe(aroll, out / "words.json", str(fetch()), lang)
     spec = plan(Path(aroll).resolve(), [Path(b).resolve() for b in broll], style, words, lines, title)
+    if (lf := out / "lang.txt").exists():
+        spec["lang"] = lf.read_text().strip()
     p = out / "spec.json"
     p.write_text(json.dumps(spec, ensure_ascii=False, indent=1))
     return p
