@@ -1,0 +1,12 @@
+# GRIN Reels — core (system: `brew install ffmpeg`)
+faster-whisper>=1.0      # local speech-to-text (MIT)
+av<16                     # faster-whisper 1.2 breaks on PyAV 16+
+numpy>=1.26
+Pillow>=10
+fonttools>=4.47
+fastapi>=0.110           # optional phone web UI
+uvicorn>=0.29
+python-multipart>=0.0.9
+opencv-python-headless>=4.8   # face detection for caption placement (Apache-2.0); optional
+pywebview>=5.0   # native app window (BSD-3)
+resvg-py>=0.5   # icons -> PNG (MPL-2.0 / Apache-2.0)

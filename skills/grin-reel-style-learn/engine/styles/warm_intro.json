@@ -1,0 +1,98 @@
+{
+ "_comment": "GRIN Reels style 'warm_intro' — © 2026 Ernest Grin. Warm talking-head intro: crushed shadows, gold accent title, phrase captions, beat montage, CTA button.",
+ "canvas": {
+  "w": 1080,
+  "h": 1920,
+  "fps": 30
+ },
+ "fonts": [
+  "fonts/Oswald-Bold.ttf",
+  "fonts/Montserrat-Medium.ttf"
+ ],
+ "aroll_look": {
+  "zoom": 1.105,
+  "x": 0.0,
+  "y": 0.118,
+  "lut": "luts/reel_warm_aroll",
+  "input_luma": 79.0
+ },
+ "broll_look": {
+  "color": "luts/reel_dark_broll",
+  "bw": "luts/reel_bw",
+  "input_luma": 122.0,
+  "normalize": false
+ },
+ "shadow": "overlays/bottom_shadow.png",
+ "caption_style": {
+  "font_name": "Montserrat Medium",
+  "size": 67,
+  "line_gap": 46,
+  "y": -0.401,
+  "color": "#FFFFFF",
+  "shadow": 1.5,
+  "shadow_alpha": 0.35,
+  "fade_ms": 60,
+  "capcut_size": 6.0
+ },
+ "title": {
+  "template": {
+   "colors": [
+    "#FFFFFF",
+    "#F6DB92"
+   ],
+   "line_delay": 0.5,
+   "blur_in": 0.3,
+   "style": {
+    "font_name": "Oswald",
+    "size": 148,
+    "scale_y": 138,
+    "y": -0.3385,
+    "line_gap": 109,
+    "shadow": 2,
+    "capcut_size": 13.0
+   }
+  }
+ },
+ "sticker": {
+  "asset": "stickers/cta/message_button.png",
+  "width": 0.366,
+  "x": 0.0,
+  "y": -0.2625,
+  "pop": 0.4,
+  "capcut_scale": 0.37
+ },
+ "fade_out": 0.53,
+ "music": {
+  "asset": null,
+  "gain_db": -12,
+  "bpm": 120,
+  "_note": "put your licensed track in library/music and set asset; reference style sits ~12 dB under the voice"
+ },
+ "phrase_gap": 0.45,
+ "cut": {
+  "pad_in": 0.08,
+  "pad_out": 0.14,
+  "max_pause": 0.55
+ },
+ "broll_rules": {
+  "window": [
+   0.08,
+   0.68
+  ],
+  "beats_per_cut": 2,
+  "montage_min": 3.0,
+  "slowmo": 0.8,
+  "center_if_longer": 3.0,
+  "_doc": "sentences alternate face/B-roll after the title inside window; long B sentences -> beat montage alternating colour/BW"
+ },
+ "caption_rules": {
+  "max_line": 16,
+  "max_chars": 34,
+  "max_words": 6
+ },
+ "asr": {
+  "model": "large-v3-turbo",
+  "fallback": "small",
+  "language": "ru"
+ }
+}
