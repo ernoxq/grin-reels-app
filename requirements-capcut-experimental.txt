@@ -1,0 +1,5 @@
+# OPTIONAL, EXPERIMENTAL, NOT PART OF GRIN REELS.
+# pyCapCut (github.com/GuanYixuan/pyCapCut) is a third-party project published WITHOUT a license.
+# It is not bundled. Install it yourself only if you accept that; drafts are unofficial and may break.
+pycapcut==0.0.4
+pymediainfo>=6.1
