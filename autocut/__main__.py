@@ -76,6 +76,8 @@ def main() -> None:
     ic.add_argument("--color", default="#1E1E1D"); ic.add_argument("--bg"); ic.add_argument("--shape", default="circle")
     ic.add_argument("--label"); ic.add_argument("--stroke", type=float, default=1.75)
     sub.add_parser("icons", help="contact sheet of all GRIN icons -> library/icons/_sheet.png")
+    pk = sub.add_parser("pick", help="sort dropped files: talking video vs inserts")
+    pk.add_argument("files", nargs="+")
     sub.add_parser("presets", help="(re)build colour presets -> library/luts/presets")
 
     sv = sub.add_parser("serve")
@@ -140,6 +142,9 @@ def main() -> None:
     elif a.cmd == "icons":
         from .icons import export_svgs, sheet
         export_svgs(); print(sheet(ROOT / "library/icons/_sheet.png"))
+    elif a.cmd == "pick":
+        from .pick import pick
+        print(json.dumps(pick(a.files), ensure_ascii=False))
     elif a.cmd == "presets":
         from .grade import build_presets
         print(len(build_presets()), "presets")

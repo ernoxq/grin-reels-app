@@ -12,6 +12,7 @@ reel, so subtitles never jump around.
 """
 from __future__ import annotations
 
+from .paths import app_root
 import subprocess
 import tempfile
 from pathlib import Path
@@ -66,7 +67,7 @@ def face_box(spec: dict, root: Path, samples: int = 6) -> tuple[float, float, fl
     segs = [s for s in spec.get("voice", []) if s.get("dur", 0) > 0.3]
     if not segs:
         return None
-    model = Path(__file__).resolve().parent.parent / "library/models/face_detection_yunet_2023mar.onnx"
+    model = app_root() / "library/models/face_detection_yunet_2023mar.onnx"
     try:
         det = cv2.FaceDetectorYN.create(str(model), "", (W // 3, H // 3), 0.7)
     except Exception:

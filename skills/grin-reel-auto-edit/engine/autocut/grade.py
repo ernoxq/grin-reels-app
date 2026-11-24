@@ -7,13 +7,14 @@ Order in the render: exposure gain -> white point fix -> LUT (preset/style) -> s
 """
 from __future__ import annotations
 
+from .paths import app_root
 import subprocess
 import tempfile
 from pathlib import Path
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = app_root()
 OUT = ROOT / "library/luts/presets"
 
 # id -> (name for people, what it does, params)

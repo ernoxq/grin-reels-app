@@ -1,6 +1,6 @@
 ---
 name: grin-reel-auto-edit
-description: Turn a talking-head video plus B-roll clips into a finished vertical reel (captions, grade, beat montage, CTA) with the GRIN Reels engine bundled in this skill — right in the chat on any device, or on the user's computer — using minimal tokens.
+description: Make a finished vertical reel (Instagram/TikTok/Shorts) from whatever videos and photos the person drops into the chat — cuts pauses and bad takes, adds subtitles, title, colour, inserts and an end button — with the GRIN Reels engine bundled in this skill. Use for «собери рилс», «смонтируй видео», «сделай рилс из этого».
 ---
 
 <!-- GRIN Reels skill — © 2026 Ernest Grin (GRIN studio). All rights reserved. Licensed to the buyer for personal use; redistribution or resale prohibited. See LICENSE.md in the GRIN Reels folder. -->
@@ -8,6 +8,16 @@ description: Turn a talking-head video plus B-roll clips into a finished vertica
 # GRIN Reels — auto-edit
 
 The goal is to turn a raw talking-head take plus B-roll into a 1080×1920 reel in a saved style. The engine makes every editing decision; you only run it, read the one-line JSON summary, and check the result once. Do not re-derive edits with the model, because that wastes the user's tokens.
+
+## Start here — the person may be using AI for the first time
+They will usually just drop a pile of videos and photos and write «Собери рилс» or even nothing. Do not ask them to sort the files or to explain anything technical.
+1. **Sort the files yourself:** run `python -m autocut pick <all attached files>`. The video with the most speech is the talking video; everything else becomes inserts, in the order they were sent. If no video has speech, say in one plain sentence that you need a video where they talk into the camera.
+2. **Say one short line before working,** for example: «Собираю рилс, это займёт 2–4 минуты». Do not narrate the steps.
+3. **If something blocks you, explain it in plain words with the exact fix.** Never show a traceback.
+   - No code execution: «Включи в Claude: Settings → Capabilities → Code execution and file creation, и напиши ещё раз».
+   - pip or the model download fails because there is no internet: switch to LITE and ask for the text of the speech.
+   - The file is too big to upload: «Сними в 1080p вместо 4K или пришли видео покороче».
+4. **Finish with the video file and two short lines.** Say what was done, then give one offer, for example: «Хочешь — поменяю шрифт, цвет или заголовок, просто напиши». Speak Russian unless they write in another language.
 
 ## 0. Engine — it ships inside this skill
 The full GRIN Reels engine is in this skill's own folder, under `engine/`. The person does not need to install or attach anything else.

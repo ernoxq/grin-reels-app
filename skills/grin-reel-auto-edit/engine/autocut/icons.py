@@ -10,9 +10,10 @@ just the line, or inside a round / rounded-square / pill badge with a label.
 """
 from __future__ import annotations
 
+from .paths import app_root
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = app_root()
 
 # name -> (Russian label, SVG body on a 24x24 grid; stroke = currentColor, fill="C" = filled with currentColor)
 ICONS: dict[str, tuple[str, str]] = {
