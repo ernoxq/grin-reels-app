@@ -76,6 +76,13 @@ def main() -> None:
     ic.add_argument("--color", default="#1E1E1D"); ic.add_argument("--bg"); ic.add_argument("--shape", default="circle")
     ic.add_argument("--label"); ic.add_argument("--stroke", type=float, default=1.75)
     sub.add_parser("icons", help="contact sheet of all GRIN icons -> library/icons/_sheet.png")
+    pl = sub.add_parser("place", help="put a photo/video/icon on top at the given words, then re-render")
+    pl.add_argument("spec"); pl.add_argument("file", nargs="?")
+    pl.add_argument("--words"); pl.add_argument("--at", type=float); pl.add_argument("--dur", type=float)
+    pl.add_argument("--how", default="full", choices=["full", "window", "sticker"]); pl.add_argument("--pos")
+    pl.add_argument("--width", type=float); pl.add_argument("--icon"); pl.add_argument("--color", default="#FFFFFF")
+    pl.add_argument("--bg", default="#1E1E1D"); pl.add_argument("--label")
+    pl.add_argument("--anim", default="pop", choices=["pop", "fade", "slide", "none"])
     pk = sub.add_parser("pick", help="sort dropped files: talking video vs inserts")
     pk.add_argument("files", nargs="+")
     sub.add_parser("presets", help="(re)build colour presets -> library/luts/presets")
@@ -142,6 +149,10 @@ def main() -> None:
     elif a.cmd == "icons":
         from .icons import export_svgs, sheet
         export_svgs(); print(sheet(ROOT / "library/icons/_sheet.png"))
+    elif a.cmd == "place":
+        from .place import place
+        print(json.dumps(place(a.spec, a.file, a.words, a.at, a.how, a.dur, a.pos, a.width, a.icon, a.color,
+                               a.bg, a.label, a.anim), ensure_ascii=False))
     elif a.cmd == "pick":
         from .pick import pick
         print(json.dumps(pick(a.files), ensure_ascii=False))

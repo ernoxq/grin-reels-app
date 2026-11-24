@@ -98,6 +98,14 @@ Set one with `lut: "luts/presets/04_teal_orange"`.
 
 **Sliders:** choices `{"adjust": {"temp": -1..1, "exposure": -1..1, "contrast": -1..1, "saturation": -1..1}}`. A positive `temp` is warmer.
 
+## 0g. Anything on top, at the right words
+After a reel is built, the person can ask to put something on top of it: «на словах про кофе покажи это фото», «сердечко на словах ‘очень рада’», «моё видео маленьким окном сверху». Use `place`, then re-render:
+- `python -m autocut place jobs/NAME/spec.json FILE --words "про кофе" [--how full|window|sticker] [--pos top|center|bottom|left|right|top-left|top-right] [--anim pop|fade|slide|none] [--dur 2]`
+- For an icon: `python -m autocut place jobs/NAME/spec.json --icon heart --color "#1E1E1D" --bg "#E4F23C" [--label "текст"] --words "..."`
+- Then run `python -m autocut render jobs/NAME/spec.json --out jobs/NAME/final.mp4`.
+
+`full` covers the screen, like B-roll; the voice keeps playing. `window` is a small photo or video on top. `sticker` is a small PNG or icon. By default these sit at the top, away from the face and the captions. The words are found in the subtitles, and approximate word forms work.
+
 ## 1. Inputs (don't open frames)
 - The A-roll is the long clip with continuous speech; B-roll clips are the short ones. Check durations with `ffprobe` only.
 - Keep the B-roll in the order the user gave it.

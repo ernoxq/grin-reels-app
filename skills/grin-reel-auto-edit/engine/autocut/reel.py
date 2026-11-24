@@ -319,25 +319,42 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
     last = "vs"
 
     # CTA sticker with pop (scale 0.2 -> 1.08 -> 1.0) — expression-driven, no extra frames in RAM
-    if (st := spec.get("sticker")) and st.get("icon"):  # GRIN icon badge as the end button
-        from .icons import render as icon_png
-        ic = st["icon"]
-        st = dict(st, asset=str(icon_png(ic["name"], Path(out).parent / ".icons" / "cta.png", 220,
-                                         color=ic.get("color", "#FFFFFF"), bg=ic.get("bg", "#1E1E1D"),
-                                         shape=ic.get("shape", "circle"), label=ic.get("label") or None,
-                                         label_color=ic.get("label_color"))))
-    if st and st.get("asset"):
-        i = add_raw("-loop", "1", "-framerate", str(FPS), "-t", f"{st['end'] - st['start']:.3f}",
-                    "-i", _p(spec, st["asset"]))
+    # stickers on top: the end button + any overlays (photo, video, icon, PNG) placed on words/times
+    layers = ([dict(spec["sticker"], _end=True)] if spec.get("sticker") else []) + list(spec.get("overlays", []))
+    for k, st in enumerate(layers):
+        if st.get("icon"):  # GRIN icon badge (any colour, optional label)
+            from .icons import render as icon_png
+            ic = st["icon"]
+            st = dict(st, asset=str(icon_png(ic["name"], Path(out).parent / ".icons" / f"layer{k}.png", 220,
+                                             color=ic.get("color", "#FFFFFF"), bg=ic.get("bg", "#1E1E1D"),
+                                             shape=ic.get("shape", "circle"), label=ic.get("label") or None,
+                                             label_color=ic.get("label_color"))))
+        if not st.get("asset"):
+            continue
+        dur_l = st["end"] - st["start"]
+        src = _p(spec, st["asset"])
+        is_vid = Path(src).suffix.lower() in {".mov", ".mp4", ".m4v", ".webm", ".mkv"}
+        if is_vid:  # small video window on top (picture-in-picture)
+            i = add_input(src, st.get("in", 0.0), dur_l + 0.1)
+        else:
+            i = add_raw("-loop", "1", "-framerate", str(FPS), "-t", f"{dur_l:.3f}", "-i", src)
         tw = int(W * st.get("width", 0.37) / 2) * 2
+        anim = st.get("anim", "pop")  # pop | fade | slide | none
         pop = st.get("pop", 0.35)
-        sc = (f"if(lt(t,{pop}),0.2+0.88*t/{pop},if(lt(t,{pop + 0.12}),1.08-0.08*(t-{pop})/0.12,1))")
-        fc.append(f"[{i}:v]format=rgba,scale=w='trunc({tw}*{sc}/2)*2':h=-2:eval=frame,"
-                  f"setpts=PTS-STARTPTS+{st['start']:.4f}/TB[stk]")
+        sc = (f"if(lt(t,{pop}),0.2+0.88*t/{pop},if(lt(t,{pop + 0.12}),1.08-0.08*(t-{pop})/0.12,1))") \
+            if anim == "pop" and pop else "1"
+        pre = f"fps={FPS},trim=0:{dur_l:.4f}," if is_vid else ""
+        fades = (f",fade=t=in:st=0:d=0.25:alpha=1,fade=t=out:st={max(0, dur_l - 0.25):.3f}:d=0.25:alpha=1"
+                 if anim in ("fade", "slide") else "")
+        fc.append(f"[{i}:v]{pre}format=rgba,scale=w='trunc({tw}*{sc}/2)*2':h=-2:eval=frame{fades},"
+                  f"setpts=PTS-STARTPTS+{st['start']:.4f}/TB[stk{k}]")
         x = f"({W}-w)/2+{st.get('x', 0.0)}*{W}/2"
         y = f"({H}-h)/2-({st.get('y', 0.0)})*{H}/2"
-        fc.append(f"[{last}][stk]overlay=x='{x}':y='{y}':eof_action=pass:format=auto[vst]")
-        last = "vst"
+        if anim == "slide":  # glides up 6% of the screen while appearing
+            y += f"+{0.06 * H:.0f}*max(0,1-(t-{st['start']:.3f})/0.35)"
+        fc.append(f"[{last}][stk{k}]overlay=x='{x}':y='{y}':eof_action=pass:format=auto:"
+                  f"enable='between(t,{st['start']:.3f},{st['end']:.3f})'[vst{k}]")
+        last = f"vst{k}"
 
     # fades
     fo = spec.get("fade_out", 0)
