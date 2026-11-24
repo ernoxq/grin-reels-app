@@ -8,11 +8,12 @@
 """
 from __future__ import annotations
 
+from autocut.paths import app_root
 import argparse
 import json
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = app_root()
 
 
 def main() -> None:

@@ -4,6 +4,7 @@
 The phone keeps working too: the same page is served on the Wi-Fi address,
 so iPhone → Safari → Share → «На экран Домой» gives a full-screen app icon.
 """
+from .paths import app_root
 import sys
 import threading
 import time
@@ -15,12 +16,12 @@ import uvicorn
 from .server import local_ip
 
 PORT = 8765
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = app_root()
 
 
 def _serve() -> uvicorn.Server:
-    srv = uvicorn.Server(uvicorn.Config("autocut.server:app", host="0.0.0.0", port=PORT, workers=1,
-                                        log_level="warning"))
+    from .server import app  # object, not an import string: works inside the packaged app too
+    srv = uvicorn.Server(uvicorn.Config(app, host="0.0.0.0", port=PORT, workers=1, log_level="warning"))
     threading.Thread(target=srv.run, daemon=True).start()
     for _ in range(100):  # wait until it answers
         if srv.started:

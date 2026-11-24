@@ -17,6 +17,7 @@ Zero LLM tokens. Every decision is a rule learned from a reference edit (styles/
 """
 from __future__ import annotations
 
+from .paths import app_root
 import difflib
 import json
 import re
@@ -361,7 +362,7 @@ def run(aroll: str, broll: list[str], style_path: str, out_dir: str, script: str
     refs = style.get("aroll_look", {}).get("lut_ref")
     if refs:  # style learned from a reference reel: build this video's LUT toward the reference colour
         from .lutmatch import build
-        lib = Path(__file__).resolve().parent.parent / "library"
+        lib = app_root() / "library"
         nm = f"auto_{out.name}"
         build(Path(aroll), [lib / r for r in refs], lib / "luts/my" / f"{nm}.cube",
               strength=style["aroll_look"].get("lut_strength", 0.7))

@@ -14,6 +14,7 @@ Units: seconds on the output timeline; x/y in CapCut units (-1..1 = half canvas,
 """
 from __future__ import annotations
 
+from .paths import app_root
 import json
 import shutil
 from pathlib import Path
@@ -21,7 +22,7 @@ from pathlib import Path
 from .grade import adjust_filters, wb_filter
 from .media import FFMPEG, IS_MAC, run
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = app_root()
 
 
 # ------------------------------------------------------------------ helpers

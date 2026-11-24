@@ -7,10 +7,11 @@ style settings. Everything they drop into "Мои файлы" lands in library/ 
 """
 from __future__ import annotations
 
+from .paths import app_root
 import copy
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = app_root()
 LIB = ROOT / "library"
 KINDS = {  # app tab -> folder + accepted extensions
     "fonts": ("fonts", {".ttf", ".otf"}),

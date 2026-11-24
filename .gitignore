@@ -4,3 +4,6 @@ library/.index.json
 __pycache__/
 *.pyc
 .venv/
+.buildvenv/
+build/
+dist/

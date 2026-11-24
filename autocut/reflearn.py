@@ -10,6 +10,7 @@ Output: styles/<name>.json (based on an existing style) + library/looks/<name>/.
 """
 from __future__ import annotations
 
+from .paths import app_root
 import json
 import re
 import subprocess
@@ -18,7 +19,7 @@ from pathlib import Path
 import numpy as np
 from PIL import Image, ImageDraw
 
-ROOT = Path(__file__).resolve().parent.parent
+ROOT = app_root()
 
 
 def _dur(p: Path) -> float:
