@@ -24,7 +24,7 @@ for s in 16 32 128 256 512; do
 done
 iconutil -c icns $ICONSET -o build/AppIcon.icns
 
-pyinstaller --noconfirm --clean --windowed --name "GRIN Reels" \
+pyinstaller --noconfirm --clean --windowed --name "GRIN Reels" --paths . \
   --icon build/AppIcon.icns --osx-bundle-identifier com.usegrin.reels \
   --add-data "web:web" --add-data "library:library" --add-data "styles:styles" --add-data "presets:presets" \
   --add-binary "build/bin/ffmpeg:bin" --add-binary "build/bin/ffprobe:bin" \
