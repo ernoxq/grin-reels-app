@@ -122,6 +122,16 @@ def reveal(jid: str) -> dict:  # «Показать в Finder» in the Mac app
     return {"path": p}
 
 
+@app.get("/api/icon/{name}.svg")
+def icon_svg(name: str, color: str = "#1E1E1D"):
+    from fastapi.responses import Response
+    from .icons import ICONS, svg
+    if name not in ICONS or not re.fullmatch(r"#?[0-9A-Fa-f]{3,8}|currentColor", color):
+        raise HTTPException(404)
+    return Response(svg(name, color if color.startswith("#") or color == "currentColor" else "#" + color, size=24),
+                    media_type="image/svg+xml")
+
+
 @app.get("/api/library")
 def library() -> dict:
     return list_library()

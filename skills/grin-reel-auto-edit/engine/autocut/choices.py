@@ -31,12 +31,28 @@ def font_family(path: Path) -> str:
     return path.stem
 
 
+def _nice(p: Path, kind: str) -> str:
+    import re
+    if kind == "luts":
+        head = p.read_text(errors="ignore")[:200]
+        m = re.search(r'TITLE\s+"([^"]+)"', head)
+        if m and "presets" in p.parts:
+            return "Пресет: " + m.group(1)
+    if kind == "fonts":
+        st = re.sub(r"(?<=[a-z])(?=[A-Z])", " ", p.stem).replace("-", " · ").replace("_", " ")
+        return st
+    return p.stem.replace("_", " ")
+
+
 def list_library() -> dict:
     out = {}
     for kind, (folder, exts) in KINDS.items():
         base = LIB / folder
         files = sorted(p for p in base.rglob("*") if p.suffix.lower() in exts) if base.exists() else []
-        out[kind] = [{"id": str(p.relative_to(LIB)), "name": p.stem.replace("_", " ")} for p in files]
+        out[kind] = [{"id": str(p.relative_to(LIB)), "name": _nice(p, kind)} for p in files
+                     if not p.name.startswith("auto_")]
+    from .icons import GROUPS, ICONS
+    out["icons"] = [{"id": n, "name": ICONS[n][0], "group": g} for g, ns in GROUPS.items() for n in ns]
     names = {"warm_intro": "Тёплый интро (GRIN)"}
     out["styles"] = [{"id": p.name, "name": names.get(p.stem) or ("По референсу: " + p.stem[4:].replace("_", " ")
                                                                 if p.stem.startswith("ref_") else p.stem.replace("_", " "))}
@@ -97,6 +113,18 @@ def apply_choices(style: dict, ch: dict) -> dict:
                 cs["box"] = {"color": "#000000", "alpha": 0.55, "pad": 14}
             else:
                 cs.pop("box", None)
+    if ch.get("wb") == "auto":
+        s["aroll_look"]["wb"] = "auto"
+    adj = {k: float(v) for k, v in (ch.get("adjust") or {}).items() if v not in (None, "", 0, "0")}
+    if adj:
+        s["aroll_look"]["adjust"] = adj
+    if ic := ch.get("cta_icon"):  # end button drawn from the GRIN icon set
+        s.setdefault("sticker", {"x": 0.0, "y": -0.2625, "pop": 0.4, "capcut_scale": 0.37})
+        lab = (ch.get("cta_label") or "").strip()
+        s["sticker"].update(icon={"name": ic, "label": lab, "color": ch.get("cta_color") or "#FFFFFF",
+                                  "bg": ch.get("cta_bg") or "#1E1E1D", "shape": "pill" if lab else "circle"},
+                            width=0.42 if lab else 0.17)
+        s["sticker"].pop("asset", None)
     if ch.get("shadow") is False:
         s.pop("shadow", None)
     return s

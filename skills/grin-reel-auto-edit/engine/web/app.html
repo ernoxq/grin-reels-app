@@ -96,6 +96,13 @@ input[type=range]{width:100%;margin-top:16px;accent-color:var(--ink)}
 .check{display:flex;gap:12px;align-items:flex-start;margin-top:12px;font-size:14px;color:var(--soft)}
 .check input{width:22px;height:22px;margin-top:1px;accent-color:var(--ink)}
 .check b{color:var(--ink);font-weight:500}
+.sub{margin-top:16px;padding-top:16px;border-top:1px solid var(--line)}
+.icons{display:grid;grid-template-columns:repeat(auto-fill,minmax(52px,1fr));gap:8px;margin-top:8px;max-height:200px;overflow:auto;padding:2px}
+.icons button{aspect-ratio:1;border:0;border-radius:50%;background:var(--white);cursor:pointer;display:grid;place-items:center;padding:0}
+.icons button img{width:24px;height:24px}
+.icons button[aria-pressed="true"]{background:var(--acc);box-shadow:0 0 0 2px var(--dark) inset}
+.sliders input[type=range]{margin-top:10px}
+.link{border:0;background:none;color:var(--soft);font:inherit;font-size:13px;text-decoration:underline;cursor:pointer;padding:8px 0 0}
 .ref{margin-top:14px;padding-top:14px;border-top:1px solid var(--line)}
 .ref .drop{background:var(--well)}
 .note{font-size:13px;color:var(--soft);margin-top:8px}
@@ -208,10 +215,32 @@ video{width:100%;max-height:70vh;border-radius:var(--r-m);background:#000;margin
           <label class="f">Шрифт заголовка<select id="tfont"><option value="">Как в стиле</option></select></label>
           <label class="f">Шрифт субтитров<select id="cfont"><option value="">Как в стиле</option></select></label>
           <label class="f">Акцентный цвет<span class="color"><input type="color" id="accent" value="#F6DB92"><code id="accV">#F6DB92</code></span></label>
-          <label class="f">Цветокор<select id="lut"><option value="">Как в стиле</option><option value="none">Без цветокора</option></select></label>
+          <label class="f">Цвет (пресет или свой LUT)<select id="lut"><option value="">Как в стиле</option><option value="none">Без цветокора</option></select></label>
           <label class="f">Музыка<select id="music"><option value="">Без музыки</option></select></label>
           <label class="f">Громкость музыки <small>тише ← → громче</small><input type="range" id="mdb" min="-24" max="-6" step="1" value="-12"></label>
-          <label class="f">Кнопка в конце<select id="cta"><option value="">Message (по умолчанию)</option><option value="none">Без кнопки</option></select></label>
+          <label class="f">Кнопка в конце<select id="cta"><option value="">Message (по умолчанию)</option><option value="none">Без кнопки</option><option value="icon">Своя — из иконок GRIN</option></select></label>
+        </div>
+        <div class="sub" id="iconBox" hidden>
+          <div class="f">Иконка</div>
+          <div class="icons" id="icons"></div>
+          <div class="grid" style="margin-top:12px">
+            <label class="f">Надпись <small>(пусто = только иконка)</small><input type="text" id="ctaLabel" placeholder="Напиши мне" maxlength="22"></label>
+            <div class="grid" style="gap:10px">
+              <label class="f">Иконка и текст<span class="color"><input type="color" id="ctaColor" value="#FFFFFF"></span></label>
+              <label class="f">Фон<span class="color"><input type="color" id="ctaBg" value="#1E1E1D"></span></label>
+            </div>
+          </div>
+        </div>
+        <div class="sub">
+          <div class="head" style="margin-bottom:2px"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#1E1E1D" stroke-width="1.75" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 3.5a8.5 8.5 0 0 1 0 17z" fill="#1E1E1D"/></svg></span><h2>Цвет точнее</h2></div>
+          <label class="check"><input type="checkbox" id="wb"><span><b>Точка белого — авто.</b> Программа найдёт в кадре белое (стену, рубашку, лист) и уберёт лишнюю желтизну или синеву.</span></label>
+          <div class="grid sliders">
+            <label class="f">Холоднее ← → Теплее<input type="range" id="aTemp" min="-1" max="1" step="0.1" value="0"></label>
+            <label class="f">Темнее ← → Светлее<input type="range" id="aExp" min="-1" max="1" step="0.1" value="0"></label>
+            <label class="f">Мягче ← → Контрастнее<input type="range" id="aCon" min="-1" max="1" step="0.1" value="0"></label>
+            <label class="f">Бледнее ← → Сочнее<input type="range" id="aSat" min="-1" max="1" step="0.1" value="0"></label>
+          </div>
+          <button type="button" class="link" id="aReset">Сбросить ползунки</button>
         </div>
         <div class="ref">
           <div class="head"><span class="mark"><svg viewBox="0 0 24 24" fill="none" stroke="#1E1E1D" stroke-width="2"><path d="M12 3l2.6 5.6 6 .7-4.5 4.1 1.2 6L12 16.5 6.7 19.4l1.2-6L3.4 9.3l6-.7z"/></svg></span><h2>Стиль по чужому ролику</h2></div>
@@ -266,7 +295,7 @@ video{width:100%;max-height:70vh;border-radius:var(--r-m);background:#000;margin
 
 <script>
 const $ = s => document.querySelector(s);
-let A = null, B = [], LIB = {}, CAP = '';
+let A = null, B = [], LIB = {}, CAP = '', ICON = 'send';
 
 function tab(n){ $('#p1').hidden = n!==1; $('#p2').hidden = n!==2;
   $('#t1').setAttribute('aria-selected', n===1); $('#t2').setAttribute('aria-selected', n===2); }
@@ -298,12 +327,21 @@ $('#accent').oninput = e => $('#accV').textContent = e.target.value.toUpperCase(
 document.querySelectorAll('#capseg button').forEach(b => b.onclick = () => {
   CAP = b.dataset.v; document.querySelectorAll('#capseg button').forEach(x => x.setAttribute('aria-pressed', x===b)); });
 
+function drawIcons(){
+  const box = $('#icons'); const pick = (LIB.icons||[]).filter(i => i.group !== 'Цвет');
+  box.innerHTML = pick.map(i => `<button type="button" title="${esc(i.name)}" data-n="${i.id}" aria-pressed="${i.id===ICON}"><img alt="${esc(i.name)}" src="/api/icon/${i.id}.svg?color=%231E1E1D"></button>`).join('');
+  box.querySelectorAll('button').forEach(b => b.onclick = () => { ICON = b.dataset.n;
+    box.querySelectorAll('button').forEach(x => x.setAttribute('aria-pressed', x===b)); });
+}
+$('#cta').onchange = () => $('#iconBox').hidden = $('#cta').value !== 'icon';
+$('#aReset').onclick = () => ['#aTemp','#aExp','#aCon','#aSat'].forEach(id => $(id).value = 0);
 function fill(sel, items, keep){ const s=$(sel); const cur = s.value; [...s.options].slice(keep).forEach(o=>o.remove());
   items.forEach(it => s.add(new Option(it.name, it.id))); if ([...s.options].some(o=>o.value===cur)) s.value = cur; }
 function drawLib(){
   fill('#style', LIB.styles, 0); fill('#tfont', LIB.fonts, 1); fill('#cfont', LIB.fonts, 1);
   fill('#lut', LIB.luts, 2); fill('#music', LIB.music, 1);
-  fill('#cta', LIB.stickers.filter(s => !s.id.includes('message_button')), 2);
+  fill('#cta', LIB.stickers.filter(s => !s.id.includes('message_button')), 3);
+  drawIcons();
   for (const k of ['fonts','music','stickers','luts'])
     document.querySelector(`[data-list="${k}"]`).innerHTML = LIB[k].map(f=>`<li><span>${esc(f.name)}</span></li>`).join('') || '<li><span>Пока пусто</span></li>';
 }
@@ -334,7 +372,11 @@ dropzone($('#dR'), async fs => {
 $('#go').onclick = () => {
   const ch = { title: $('#title').value.trim(), title_font: $('#tfont').value, caption_font: $('#cfont').value,
     accent: $('#accent').value, lut: $('#lut').value, music: $('#music').value || '', music_db: $('#mdb').value,
-    cta: $('#cta').value || null, lite: $('#lite').checked, captions: CAP };
+    cta: ($('#cta').value === 'icon' ? null : $('#cta').value) || null, lite: $('#lite').checked, captions: CAP,
+    wb: $('#wb').checked ? 'auto' : '',
+    adjust: { temp: +$('#aTemp').value, exposure: +$('#aExp').value, contrast: +$('#aCon').value, saturation: +$('#aSat').value } };
+  if ($('#cta').value === 'icon') Object.assign(ch, { cta_icon: ICON, cta_label: $('#ctaLabel').value.trim(),
+    cta_color: $('#ctaColor').value, cta_bg: $('#ctaBg').value });
   const fd = new FormData(); fd.append('aroll', A); B.forEach(f => fd.append('broll', f));
   fd.append('script', $('#script').value); fd.append('style', $('#style').value || 'warm_intro.json');
   fd.append('choices', JSON.stringify(ch));

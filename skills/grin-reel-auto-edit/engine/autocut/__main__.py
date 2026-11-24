@@ -70,6 +70,13 @@ def main() -> None:
     lr.add_argument("--name", required=True)
     lr.add_argument("--base", default="warm_intro")
 
+    ic = sub.add_parser("icon", help="GRIN icon -> PNG sticker (any colour)")
+    ic.add_argument("name"); ic.add_argument("--out", type=Path); ic.add_argument("--size", type=int, default=256)
+    ic.add_argument("--color", default="#1E1E1D"); ic.add_argument("--bg"); ic.add_argument("--shape", default="circle")
+    ic.add_argument("--label"); ic.add_argument("--stroke", type=float, default=1.75)
+    sub.add_parser("icons", help="contact sheet of all GRIN icons -> library/icons/_sheet.png")
+    sub.add_parser("presets", help="(re)build colour presets -> library/luts/presets")
+
     sv = sub.add_parser("serve")
     sv.add_argument("--host", default="0.0.0.0")
     sv.add_argument("--port", type=int, default=8765)
@@ -125,6 +132,16 @@ def main() -> None:
     elif a.cmd == "style-from-ref":
         from .reflearn import learn
         print(json.dumps(learn(a.reference, a.name, a.base), ensure_ascii=False, indent=1))
+    elif a.cmd == "icon":
+        from .icons import render
+        out = a.out or ROOT / "library/stickers/my" / f"icon_{a.name}.png"
+        print(render(a.name, out, a.size, color=a.color, bg=a.bg, shape=a.shape, label=a.label, stroke=a.stroke))
+    elif a.cmd == "icons":
+        from .icons import export_svgs, sheet
+        export_svgs(); print(sheet(ROOT / "library/icons/_sheet.png"))
+    elif a.cmd == "presets":
+        from .grade import build_presets
+        print(len(build_presets()), "presets")
     elif a.cmd == "serve":
         import uvicorn
         uvicorn.run("autocut.server:app", host=a.host, port=a.port, workers=1)

@@ -15,8 +15,10 @@ Units: seconds on the output timeline; x/y in CapCut units (-1..1 = half canvas,
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
+from .grade import adjust_filters, wb_filter
 from .media import FFMPEG, IS_MAC, run
 
 ROOT = Path(__file__).resolve().parent.parent
@@ -63,8 +65,10 @@ def _final_encoder(quality: str) -> list[str]:
     if quality == "prores":
         return ["-c:v", "prores_videotoolbox" if IS_MAC else "prores_ks", "-profile:v", "3", "-pix_fmt", "yuv422p10le"]
     if IS_MAC:  # Apple Silicon hardware HEVC, ~45 Mbit/s like CapCut's "Higher"
-        return ["-c:v", "hevc_videotoolbox", "-b:v", "45M", "-tag:v", "hvc1", "-pix_fmt", "yuv420p"]
-    return ["-c:v", "libx264", "-preset", "medium", "-crf", "16", "-pix_fmt", "yuv420p"]
+        return ["-c:v", "hevc_videotoolbox", "-b:v", "18M", "-maxrate", "24M", "-tag:v", "hvc1", "-pix_fmt", "yuv420p"]
+    # smooth playback in phone players / chat previews; still far above what Instagram keeps (~3-5 Mbit/s)
+    return ["-c:v", "libx264", "-preset", "medium", "-crf", "18", "-maxrate", "14M", "-bufsize", "28M",
+            "-profile:v", "high", "-level", "4.2", "-pix_fmt", "yuv420p"]
 
 
 # ------------------------------------------------------------------ captions (ASS)
@@ -149,8 +153,7 @@ def write_ass(spec: dict, out: Path) -> Path:
         if not st.get("pop"):
             return ""
         bx, by = st.get("scale_x", 100) * sc, st.get("scale_y", 100) * sc
-        return (f"\\fscx{bx * .7:.0f}\\fscy{by * .7:.0f}\\t(0,110,\\fscx{bx * 1.06:.0f}\\fscy{by * 1.06:.0f})"
-                f"\\t(110,180,\\fscx{bx:.0f}\\fscy{by:.0f})")
+        return (f"\\fscx{bx * .9:.0f}\\fscy{by * .9:.0f}\\t(0,120,\\fscx{bx:.0f}\\fscy{by:.0f})")
     mode = cs.get("mode", "phrase")
     if mode == "words":  # 1-3 words at a time, the spoken word lights up (short-form "word pop" look)
         hl = _bgr(cs.get("highlight") or spec.get("title", {}).get("colors", ["#FFFFFF", "#F6DB92"])[-1])
@@ -255,7 +258,8 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
     for k, seg in enumerate(spec["voice"]):
         i = add_input(_src(spec, seg["src"]), seg["in"], seg["dur"])
         fc.append(f"[{i}:v]fps={FPS},scale={sw}:{sh}:flags=lanczos,crop={W}:{H}:{cx}:{cy},setsar=1"
-                  f"{_gain(look.get('gain'))}{lut(look.get('lut'))},format=yuv420p,setpts=PTS-STARTPTS[av{k}]")
+                  f"{_gain(look.get('gain'))}{wb_filter(look.get('wb_gain'))}{lut(look.get('lut'))}{adjust_filters(look.get('adjust'))}"
+                  f",format=yuv420p,setpts=PTS-STARTPTS[av{k}]")
         fc.append(f"[{i}:a]aresample=48000,asetpts=PTS-STARTPTS[aa{k}]")
         vlabels.append(f"[av{k}]")
         alabels.append(f"[aa{k}]")
@@ -268,7 +272,7 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
         sp = b.get("speed", 1.0)
         if b.get("image"):  # photo: gentle push-in (Ken Burns), same grade as video B-roll
             i = add_raw("-loop", "1", "-framerate", str(FPS), "-t", f"{b['dur'] + 0.1:.3f}", "-i", _src(spec, b["src"]))
-            grade = _gain(b.get("gain")) + (lut(bl.get("bw")) + ",hue=s=0" if b.get("look") == "bw" else lut(bl.get("color")))
+            grade = _gain(b.get("gain")) + (lut(bl.get("bw")) + ",hue=s=0" if b.get("look") == "bw" else lut(bl.get("color"))) + adjust_filters(bl.get("adjust") or look.get("adjust"))
             frames = int(b["dur"] * FPS) + 3
             fc.append(f"[{i}:v]scale={W * 2}:{H * 2}:force_original_aspect_ratio=increase,crop={W * 2}:{H * 2},"
                       f"zoompan=z='1+0.06*on/{frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s={W}x{H}:fps={FPS},"
@@ -278,7 +282,7 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
             last = f"v{k}"
             continue
         i = add_input(_src(spec, b["src"]), b["in"], b["dur"] * sp + 0.1)
-        grade = _gain(b.get("gain")) + (lut(bl.get("bw")) + ",hue=s=0" if b.get("look") == "bw" else lut(bl.get("color")))
+        grade = _gain(b.get("gain")) + (lut(bl.get("bw")) + ",hue=s=0" if b.get("look") == "bw" else lut(bl.get("color"))) + adjust_filters(bl.get("adjust") or look.get("adjust"))
         fc.append(f"[{i}:v]setpts=(PTS-STARTPTS)/{sp},fps={FPS},scale={W}:{H}:force_original_aspect_ratio=increase,"
                   f"crop={W}:{H},setsar=1{grade},format=yuv420p,trim=0:{b['dur']:.4f},"
                   f"setpts=PTS+{b['start']:.4f}/TB[b{k}]")
@@ -302,13 +306,26 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
             ps["title"] = dict(spec["title"], style=dict(spec["title"]["style"], size=spec["title"]["style"]["size"] // 2,
                                                        line_gap=spec["title"]["style"].get("line_gap", 110) // 2))
         ass = write_ass(ps, Path(out).with_suffix(".ass"))
-    fonts = sorted({str(Path(_p(spec, f)).parent) for f in spec.get("fonts", [])})
-    fd = f":fontsdir='{_esc(fonts[0])}'" if fonts else ""
+    # libass reads ONE fonts folder: gather every font the spec uses (any library subfolder) into one
+    fdir = Path(out).parent / ".fonts"
+    fdir.mkdir(parents=True, exist_ok=True)
+    for f in spec.get("fonts", []):
+        src = Path(_p(spec, f))
+        if src.exists() and not (fdir / src.name).exists():
+            shutil.copy2(src, fdir / src.name)
+    fd = f":fontsdir='{_esc(str(fdir))}'" if spec.get("fonts") else ""
     fc.append(f"[{last}]subtitles='{_esc(str(ass))}'{fd}[vs]")
     last = "vs"
 
     # CTA sticker with pop (scale 0.2 -> 1.08 -> 1.0) — expression-driven, no extra frames in RAM
-    if st := spec.get("sticker"):
+    if (st := spec.get("sticker")) and st.get("icon"):  # GRIN icon badge as the end button
+        from .icons import render as icon_png
+        ic = st["icon"]
+        st = dict(st, asset=str(icon_png(ic["name"], Path(out).parent / ".icons" / "cta.png", 220,
+                                         color=ic.get("color", "#FFFFFF"), bg=ic.get("bg", "#1E1E1D"),
+                                         shape=ic.get("shape", "circle"), label=ic.get("label") or None,
+                                         label_color=ic.get("label_color"))))
+    if st and st.get("asset"):
         i = add_raw("-loop", "1", "-framerate", str(FPS), "-t", f"{st['end'] - st['start']:.3f}",
                     "-i", _p(spec, st["asset"]))
         tw = int(W * st.get("width", 0.37) / 2) * 2

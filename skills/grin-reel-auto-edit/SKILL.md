@@ -56,6 +56,38 @@ Change only what was asked, run, and show the result.
 
 **Safe zone:** titles and captions are kept automatically inside the area that Reels, TikTok and Shorts never cover. They are also moved off the speaker's face, using YuNet in `library/models`. If the person sends their own safe-zone frame picture (white = safe), run `python -m autocut safe-from-frame frame.png` and put the JSON into the style as `safe_zone`.
 
+## 0f. Fonts, icons, colour presets
+**Fonts (all OFL, Cyrillic).** The skill carries Montserrat, Oswald and Inter. Other families live in the public repo; fetch one only when the person picks it:
+`curl -sSL -o library/fonts/<dir>/<File>.ttf https://raw.githubusercontent.com/ernoxq/grin-reels-app/main/library/fonts/<dir>/<File>.ttf`
+Available folders:
+- comforter, cormorantgaramond, didactgothic, greatvibes, inter, jost, lobster, manrope, marckscript;
+- montserrat, notoserifdisplay, oldstandardtt, orelegaone, playfairdisplay, playfairdisplaysc, podkova, prata;
+- ptserif, robotocondensed, sourcesans3.
+
+File names follow the pattern `Family-Weight.ttf`, for example `PlayfairDisplay-Italic.ttf` or `Jost-SemiBold.ttf`.
+
+Good pairs to suggest:
+- Playfair Display + Inter;
+- Cormorant Garamond + Jost;
+- Prata + Lobster;
+- Noto Serif Display + Manrope;
+- Old Standard TT + Didact Gothic;
+- Great Vibes + Montserrat;
+- Roboto Condensed + Comforter.
+
+**Icons.** There are 61 GRIN line icons in `autocut/icons.py`, one family on a 24 px grid. Make a PNG sticker in any colour with `python -m autocut icon send --color "#1E1E1D" --bg "#E4F23C" --label "Напиши мне" --out x.png`, then use it as `cta` or an overlay. Show the set with `python -m autocut icons`, which writes `library/icons/_sheet.png`. For the end button there is a shortcut: `apply_choices(style, {"cta_icon": "send", "cta_label": "...", "cta_color": "#...", "cta_bg": "#..."})`.
+
+**Colour presets** live in `library/luts/presets/*.cube`. Each has a Russian title:
+- 01 Чистый нейтральный, 02 Тёплый вечер, 03 Холодное утро, 04 Кино: бирюза и оранжевый;
+- 05 Плёнка, 06 Пастель, 07 Сочный, 08 Матовый;
+- 09 Тёмный и глубокий, 10 Золотой час, 11 Ч/Б мягкий, 12 Ч/Б контрастный.
+
+Set one with `lut: "luts/presets/04_teal_orange"`.
+
+**White point:** choices `{"wb": "auto"}` neutralises colour casts for each video.
+
+**Sliders:** choices `{"adjust": {"temp": -1..1, "exposure": -1..1, "contrast": -1..1, "saturation": -1..1}}`. A positive `temp` is warmer.
+
 ## 1. Inputs (don't open frames)
 - The A-roll is the long clip with continuous speech; B-roll clips are the short ones. Check durations with `ffprobe` only.
 - Keep the B-roll in the order the user gave it.

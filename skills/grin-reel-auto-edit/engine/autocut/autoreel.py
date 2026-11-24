@@ -367,6 +367,9 @@ def run(aroll: str, broll: list[str], style_path: str, out_dir: str, script: str
               strength=style["aroll_look"].get("lut_strength", 0.7))
         style["aroll_look"] = dict(style["aroll_look"], lut=f"luts/my/{nm}")
         style["broll_look"] = dict(style.get("broll_look", {}), color=f"luts/my/{nm}")
+    if style.get("aroll_look", {}).get("wb") == "auto":  # white point: make whites white for this video
+        from .grade import auto_white_point
+        style["aroll_look"] = dict(style["aroll_look"], wb_gain=auto_white_point(str(aroll)))
     lines = [l.strip() for l in Path(script).read_text(encoding="utf-8").splitlines() if l.strip()] if script else None
     if words_json:
         words = [Word(**w) for w in json.loads(Path(words_json).read_text())]
