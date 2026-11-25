@@ -67,7 +67,8 @@ def build_timeline(spec_path: Path) -> dict:
         f = o.get("file") or o.get("asset")
         if f:
             over.append({"file": str(f if Path(f).is_absolute() else app_root() / "library" / f), "in": 0.0,
-                         "start": o["start"], "dur": o["end"] - o["start"], "speed": 1.0,
+                         "start": o["start"], "dur": o["end"] - o["start"], "speed": 1.0, "layer": True,
+                         "x": o.get("x", 0.0), "y": o.get("y", 0.0), "width": o.get("width", 1.0),
                          "image": Path(f).suffix.lower() in {".png", ".jpg", ".jpeg", ".webp"}})
     caps = [{"text": c["text"].replace("\n", " "), "start": c["start"], "end": c["end"]} for c in spec["captions"]]
     title = spec.get("title") or {}
@@ -237,7 +238,9 @@ def write_capcut(tl: dict, out_dir: Path, mac_draft_dir: str, mapper=lambda p: p
             mats.setdefault(e["kind"], []).append(m); refs.append(m["id"])
         return refs
 
-    def vseg(item: dict, render: int, volume: float, scale: float = 1.0) -> dict:
+    def vseg(item: dict, render: int, volume: float, scale: float | None = None) -> dict:
+        if scale is None:
+            scale = item.get("width", 1.0) if item.get("layer") else 1.0
         s = copy.deepcopy(tpl["video"]["segment"])
         sp = item.get("speed", 1.0) or 1.0
         s.update({"id": _uid(), "material_id": video_mat(item["file"]), "speed": sp, "volume": volume,
@@ -247,7 +250,7 @@ def write_capcut(tl: dict, out_dir: Path, mac_draft_dir: str, mapper=lambda p: p
                   "source_timerange": None if item.get("image") else
                   {"start": int(item["in"] * US), "duration": int(item["dur"] * sp * US)}})
         s["clip"]["scale"] = {"x": scale, "y": scale}
-        s["clip"]["transform"] = {"x": 0.0, "y": 0.0}
+        s["clip"]["transform"] = {"x": item.get("x", 0.0), "y": item.get("y", 0.0)}
         return s
 
     def text_seg(text: str, start: float, end: float, size: float, y: float, font: str | None, color=(1, 1, 1),
@@ -278,8 +281,12 @@ def write_capcut(tl: dict, out_dir: Path, mac_draft_dir: str, mapper=lambda p: p
 
     fonts = font_files or {}
     tracks = [track("video", [vseg(m, 0, 1.0) for m in tl["main"]])]
-    if tl["over"]:
-        tracks.append(track("video", [vseg(o, 1, 0.0) for o in tl["over"]]))
+    ins = [o for o in tl["over"] if not o.get("layer")]
+    lay = [o for o in tl["over"] if o.get("layer")]
+    if ins:
+        tracks.append(track("video", [vseg(o, 1, 0.0) for o in ins]))
+    for k, o in enumerate(sorted(lay, key=lambda o: o["start"])):  # each graphic on its own track (they may overlap)
+        tracks.append(track("video", [vseg(o, 3 + k, 0.0)]))
     if tl.get("sticker"):
         s = tl["sticker"]
         tracks.append(track("video", [vseg({"file": s["file"], "in": 0, "start": s["start"], "dur": s["end"] - s["start"],
@@ -327,7 +334,7 @@ def export_all(spec_path: Path, deliver: Path, name: str, video: Path | None = N
     got = {}
     # library files (sticker, overlays) are copied next to the project so the editor can find them
     def keep(f: str) -> str:
-        if str(f).startswith(str(app_root())):
+        if str(f).startswith(str(app_root())) or str(f).startswith(str(Path(spec_path).resolve().parent)):
             dst = assets / Path(f).name
             shutil.copy2(f, dst)
             return str(dst)

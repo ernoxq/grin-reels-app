@@ -229,7 +229,8 @@ def plan_broll(sentences: list[tuple[float, float]], clips: list[dict], style: d
     beat = r.get("cut_len") or 60.0 / style.get("music", {}).get("bpm", 120) * r.get("beats_per_cut", 2)
     last = sentences[-1][0] if len(sentences) > 2 else total
     slots = [(s, e) for k, (s, e) in enumerate(sentences)
-             if 0 < k < len(sentences) - 1 and k % 2 == 1 and s >= lo * total and e <= min(hi * total, last)]
+             if 0 < k < len(sentences) - 1 and k % 2 == 1 and s >= lo * total and e <= min(hi * total, last)
+             and e - s >= r.get("min_insert", 1.5)]
     if not clips or not slots:
         return []
     if len(clips) < len(slots):  # spread evenly

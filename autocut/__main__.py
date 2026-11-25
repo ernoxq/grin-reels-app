@@ -16,6 +16,25 @@ from pathlib import Path
 ROOT = app_root()
 
 
+def _finish(job: Path, t0: float) -> dict:
+    import time
+    from .reel import load_spec, render_reel
+    args = json.loads((job / "auto_args.json").read_text())
+    spec_path = job / "spec.json"
+    video = render_reel(load_spec(spec_path), job / "final.mp4")
+    s = json.loads(spec_path.read_text())
+    extra = {}
+    if args.get("deliver") or args.get("export"):
+        from .nle import export_all
+        name = args.get("name") or time.strftime("Рилс %d.%m %H-%M")
+        kinds = tuple(k.strip() for k in (args.get("export") or "").split(",") if k.strip()) or ("srt",)
+        extra = export_all(spec_path, Path(args["deliver"]) if args.get("deliver") else job, name, video,
+                           Path(args["capcut_root"]) if args.get("capcut_root") else None, args.get("map"), kinds)
+    return {**extra, "video": extra.get("video") or str(Path(video).resolve()), "sec": round(s["duration"], 1),
+            "parts": [Path(x).name for x in args.get("parts", [])], "inserts": len(s["broll"]),
+            "lang": s.get("lang"), "took_s": round(time.time() - t0)}
+
+
 def main() -> None:
     ap = argparse.ArgumentParser("autocut")
     sub = ap.add_subparsers(dest="cmd", required=True)
@@ -52,6 +71,13 @@ def main() -> None:
     rl.add_argument("--quality", default="high", choices=["high", "prores"])
     rl.add_argument("--lang", help="speech language (ro, ru, en...); default: detect automatically")
 
+    fe = sub.add_parser("fetch", help="download reels by link (Instagram, TikTok, YouTube) into a folder")
+    fe.add_argument("urls", nargs="+")
+    fe.add_argument("--out", type=Path, default=Path("refs"))
+
+    fi = sub.add_parser("finish", help="render a planned job (after the storyboard was approved) + export")
+    fi.add_argument("job", type=Path)
+
     ex = sub.add_parser("export", help="spec.json -> CapCut draft / FCPXML / SRT in the person's folders")
     ex.add_argument("spec", type=Path)
     ex.add_argument("--deliver", type=Path, required=True)
@@ -76,6 +102,9 @@ def main() -> None:
     au.add_argument("--export", default="", help="comma list: capcut,fcpxml,srt (editable projects)")
     au.add_argument("--capcut-root", type=Path, help="CapCut drafts folder …/com.lveditor.draft as seen here")
     au.add_argument("--map", nargs="*", default=[], help="THIS_SHELL_PATH=REAL_COMPUTER_PATH for paths inside projects")
+    au.add_argument("--plan", action="store_true", help="storyboard only: print the plan, render later with `finish`")
+    au.add_argument("--drop", nargs="*", default=[], help="phrases whose sentences must be cut (kept between re-plans)")
+    au.add_argument("--keep", nargs="*", default=[], help="undo an earlier --drop")
     au.add_argument("--no-inserts", action="store_true", help="talking parts only, no B-roll")
 
     rd = sub.add_parser("render", help="render a reel spec.json (after hand edits)")
@@ -110,6 +139,10 @@ def main() -> None:
     pl.add_argument("--width", type=float); pl.add_argument("--icon"); pl.add_argument("--color", default="#FFFFFF")
     pl.add_argument("--bg", default="#1E1E1D"); pl.add_argument("--label")
     pl.add_argument("--anim", default="pop", choices=["pop", "fade", "slide", "none"])
+    pl.add_argument("--motion", choices=["headline", "plate", "number", "step", "checklist"],
+                    help="animated text: headline (*marked words*), plate, number (counts up), step, checklist (a|b|c)")
+    pl.add_argument("--text"); pl.add_argument("--sub"); pl.add_argument("--n", default="01")
+    pl.add_argument("--accent", default="#E4F23C"); pl.add_argument("--font")
     pk = sub.add_parser("pick", help="sort dropped files: talking video vs inserts")
     pk.add_argument("files", nargs="+")
     sub.add_parser("presets", help="(re)build colour presets -> library/luts/presets")
@@ -169,24 +202,47 @@ def main() -> None:
             a.out = ROOT / "jobs" / time.strftime("reel_%H%M%S")
         a.out = a.out.resolve()
         a.out.mkdir(parents=True, exist_ok=True)
+        sp_f = a.out / "story_parts.json"
+        if sp_f.exists() and [x["file"] for x in json.loads(sp_f.read_text())] != [str(Path(x).resolve()) for x in srt["story"]]:
+            for f in ("story.mp4", "story_parts.json", "words.json", "words_edit.json", "auto_args.json", "lang.txt"):
+                (a.out / f).unlink(missing_ok=True)  # other files than last time: start this job fresh
         main = join(srt["story"], a.out / "story.mp4")
         model = a.model
         if model == "cloud":
             from .fetch_model import fetch
             model = str(fetch())
-        spec_path = run(str(main), [] if a.no_inserts else srt["inserts"], str(a.style), str(a.out),
-                        script=str(a.script) if a.script else None, title=a.title, model=model, language=a.lang)
-        video = render_reel(load_spec(spec_path), a.out / "final.mp4")
-        s = json.loads(spec_path.read_text())
-        extra = {}
-        if a.deliver or a.export:
-            from .nle import export_all
-            name = a.name or time.strftime("Рилс %d.%m %H-%M")
-            kinds = tuple(k.strip() for k in a.export.split(",") if k.strip()) or ("srt",)
-            extra = export_all(spec_path, a.deliver or a.out, name, video, a.capcut_root, a.map, kinds)
-        print(json.dumps({**extra, "video": extra.get("video") or str(Path(video).resolve()), "sec": round(s["duration"], 1), "parts": [Path(x).name for x in srt["story"]],
-                          "inserts": len(s["broll"]), "unused": len(srt["inserts"]) - len({b["src"] for b in s["broll"]}), "lang": s.get("lang"), "took_s": round(time.time() - t0)},
-                         ensure_ascii=False))
+        prev0 = json.loads((a.out / "auto_args.json").read_text()) if (a.out / "auto_args.json").exists() else {}
+        a.title = a.title or prev0.get("title")
+        args = dict(inserts=[] if a.no_inserts else srt["inserts"], style=str(a.style),
+                    script=str(a.script) if a.script else None, title=a.title, model=model, lang=a.lang,
+                    deliver=str(a.deliver) if a.deliver else None, name=a.name, export=a.export,
+                    capcut_root=str(a.capcut_root) if a.capcut_root else None, map=a.map, parts=srt["story"])
+        spec_path = run(str(main), args["inserts"], args["style"], str(a.out), script=args["script"],
+                        title=a.title, model=model, language=a.lang)
+        prev = json.loads((a.out / "auto_args.json").read_text()) if (a.out / "auto_args.json").exists() else {}
+        drops = [d for d in prev.get("drop", []) if d not in a.keep] + [d for d in a.drop if d not in prev.get("drop", [])]
+        args["drop"] = drops
+        if drops:
+            a.drop = drops
+            from .storyboard import drop_phrases
+            w = json.loads((a.out / "words.json").read_text())
+            (a.out / "words_edit.json").write_text(json.dumps(drop_phrases(w, a.drop), ensure_ascii=False))
+            spec_path = run(str(main), args["inserts"], args["style"], str(a.out), script=args["script"],
+                            title=a.title, words_json=str(a.out / "words_edit.json"), language=a.lang)
+        (a.out / "auto_args.json").write_text(json.dumps(args, ensure_ascii=False))
+        if a.plan:
+            from .storyboard import plan_text
+            txt = plan_text(a.out)
+            (a.out / "plan.txt").write_text(txt)
+            print(txt + f"\nJOB: {a.out}")
+            return
+        print(json.dumps(_finish(a.out, t0), ensure_ascii=False))
+    elif a.cmd == "fetch":
+        from .fetch import fetch_urls
+        print(json.dumps(fetch_urls(a.urls, a.out), ensure_ascii=False))
+    elif a.cmd == "finish":
+        import time
+        print(json.dumps(_finish(a.job.resolve(), time.time()), ensure_ascii=False))
     elif a.cmd == "render":
         from .reel import capcut_reel, load_spec, render_reel
         spec = load_spec(a.spec)
@@ -213,8 +269,20 @@ def main() -> None:
         export_svgs(); print(sheet(ROOT / "library/icons/_sheet.png"))
     elif a.cmd == "place":
         from .place import place
-        print(json.dumps(place(a.spec, a.file, a.words, a.at, a.how, a.dur, a.pos, a.width, a.icon, a.color,
-                               a.bg, a.label, a.anim), ensure_ascii=False))
+        if a.motion:
+            from .motion import render as motion_render
+            from .place import find_words
+            spec = json.loads(Path(a.spec).read_text())
+            t0, t1 = find_words(spec, a.words) if a.words else (a.at or 0.0, (a.at or 0.0) + 2)
+            d = a.dur or max(2.0, min(3.5, t1 - t0 + 1.0))
+            n = len(spec.get("overlays", []) or [])
+            clip = motion_render(a.motion, a.text or a.words or "", Path(a.spec).parent / "motion" / f"m{n}_{a.motion}.mov",
+                                 d, a.accent, sub=a.sub, label=a.label, n=a.n, font=a.font)
+            print(json.dumps(place(a.spec, str(clip), a.words, a.at, "window", d, a.pos or "center", 1.0, None,
+                                   anim="none"), ensure_ascii=False))
+        else:
+            print(json.dumps(place(a.spec, a.file, a.words, a.at, a.how, a.dur, a.pos, a.width, a.icon, a.color,
+                                   a.bg, a.label, a.anim), ensure_ascii=False))
     elif a.cmd == "pick":
         from .pick import pick
         print(json.dumps(pick(a.files), ensure_ascii=False))

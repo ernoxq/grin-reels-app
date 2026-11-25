@@ -23,12 +23,12 @@ If the session has `mcp__remote-devices__*` tools, call `get_device_info`. If a 
 
 Run it on the computer with `device_bash` (it has 4 cores and sees the files; nothing is uploaded):
 ```bash
-[ -d $HOME/grin ] || git clone -q --depth 1 https://github.com/ernoxq/grin-reels-app $HOME/grin
-F="$HOME/mnt/<folder>"; nohup bash $HOME/grin/run.sh "$F/Исходники/"* --deliver "$F/Готовое" --name "<short name>" \
+[ -d $HOME/grin ] || git clone -q --depth 1 https://github.com/ernoxq/grin-reels-app $HOME/grin; cd $HOME/grin && git pull -q
+F="$HOME/mnt/<folder>"; nohup bash run.sh "$F/Исходники/"* --plan --out $HOME/grin/jobs/r1 --deliver "$F/Готовое" --name "<short name>" \
   --export capcut,fcpxml,srt [--capcut-root "$HOME/mnt/CapCut/User Data/Projects/com.lveditor.draft"] \
   --map "$HOME/mnt/<folder>=<real path of that folder>" ["$HOME/mnt/CapCut=<real path of CapCut folder>"] > $HOME/out.txt 2>&1 &
 ```
-Real paths come from `get_device_info.connectedFolders`. Then poll: `sleep 170; tail -1 $HOME/out.txt` (device_bash calls stop at 180 s; the job keeps running).
+Real paths come from `get_device_info.connectedFolders`. Poll: `sleep 170; tail -25 $HOME/out.txt` (device_bash calls stop at 180 s; the job keeps running). Then the storyboard as in section 2, and `cd $HOME/grin && nohup python3 -m autocut finish jobs/r1 > $HOME/out.txt 2>&1 &` - it renders and writes everything into `Готовое` (and CapCut).
 - **CapCut project:** only if the person uses CapCut on this computer. Ask once to connect `~/Movies/CapCut` (device_request_folder_access) and pass `--capcut-root`; the reel then appears in CapCut after CapCut is restarted (Cmd+Q, open again). Without that folder the draft is left in `Готовое/<name> - проект/CapCut/`.
 - **DaVinci Resolve / Final Cut:** `<name> (DaVinci, Final Cut).fcpxml` in the project folder: File → Import → Timeline (DaVinci) or File → Import → XML (Final Cut).
 - Results: `Готовое/<name>.mp4`, `Готовое/<name> - проект/` (FCPXML, subtitles .srt, fonts and stickers). Say where they are in one line; do not send the video into the chat unless asked.
@@ -39,29 +39,38 @@ Real paths come from `get_device_info.connectedFolders`. Then poll: `sleep 170; 
 [ -d grin ] || cp -r <this skill's folder>/engine ./grin
 ```
 
-## 2. Build: one command for all files
+## 2. Storyboard first, then build
 ```bash
-nohup bash grin/run.sh <ALL attached videos and photos, absolute paths> [options] > grin/out.txt 2>&1 &
+nohup bash grin/run.sh <ALL attached videos and photos, absolute paths> --plan --out grin/jobs/r1 [options] > grin/out.txt 2>&1 &
 ```
-Then wait cheaply: `sleep 240; tail -1 grin/out.txt` and repeat until the JSON line appears. About 3 minutes per minute of raw video; a 3–4 minute reel can take 15–20 minutes.
-
-What the engine does by itself:
-- **Joins** every clip where the person talks to the camera into one story, in file-name order, and removes repeated takes, pauses and mistakes.
-- **Everything else** (other videos, photos) becomes inserts, spread evenly over the video; never on the first sentence (title) or the last one (end button).
-- **Detects the language** (Romanian, Russian, English...) and writes the subtitles in it.
+Wait cheaply: `sleep 120; tail -25 grin/out.txt` until the plan appears (about 1.5 min per minute of raw video).
+Show the plan to the person as it is (it is short: kept sentences with times, inserts, what was cut, title) and ask: «Собираю так или что-то поменять?». Apply what they say, re-plan (fast, speech is not recognised again), show again:
+- cut a phrase: `--drop "фраза"` (undo: `--keep "фраза"`); other title: `--title "..."`;
+- photo / video / icon on certain words: `place` (reference.md, E); animated text: `place --motion` (below);
+- run the same command with the same `--out` and the new options; earlier drops and title are remembered. A new reel gets a new `--out` (r2, r3...).
+Then render: `nohup python -m autocut finish grin/jobs/r1 > grin/out.txt 2>&1 &` (run inside `grin`), poll, read the JSON line.
+If the person says «сразу» / «без плана», skip `--plan` and the build finishes in one go.
 
 Options (add only if the person said so):
-- `--all-talking` - «соедини все», «это всё моя речь», or all clips are the person talking.
-- `--talking IMG_1 IMG_4` - only these clips are the talk; the rest are inserts.
-- `--lang ro` / `ru` / `en` - only if the person names the language or subtitles came out in the wrong one.
-- `--script script.txt` - the person sent the text: one sentence per line, exact spelling.
-- `--title "..."`, `--no-inserts`, `--out jobs/NAME` (each run gets its own folder by default).
+- `--all-talking` - «соедини все», or all clips are the person talking; `--talking IMG_1 IMG_4` - only these are the talk.
+- `--lang ro` / `ru` / `en` - only if subtitles came out in the wrong language. `--script script.txt` - exact text.
+- `--no-inserts`.
 
-The JSON line: `video`, `sec`, `parts` (clips used as the talk), `inserts`, `unused`, `lang`.
-If `parts` looks wrong (an insert was taken as talk, or a talk clip is missing), rerun once with `--talking` and name the right clips.
+The engine itself joins every talking clip in file-name order, removes repeats, pauses and mistakes, spreads the other files evenly as inserts (never on the title or the end), detects the language.
+
+**Motion graphics (animated text in GRIN style)** - offer when a number, a name, a step or a key phrase deserves it:
+`python -m autocut place grin/jobs/r1/spec.json --motion KIND --text "..." --words "слова из речи" [--pos top|center|bottom] [--accent "#E4F23C"]`
+- `headline` - big words pop in, `*phrase in stars*` gets a marker: «Монтаж за *15 минут*»;
+- `plate` - name plate, `--sub` small line above: «Кристина» / «свадебный рилсмейкер»;
+- `number` - counts up: «30 000 лей», `--label` under it;
+- `step` - numbered circle + label, `--n 02`;
+- `checklist` - `"пункт 1|пункт 2|пункт 3"` with ticks.
+Each is a separate clip in the CapCut / DaVinci project, so it stays editable. Do not look at the result yourself.
+
+**Reference by link:** `python -m autocut fetch URL --out <Референсы or refs>`. If it answers `network` or `login`, tell the person: «Не могу скачать по ссылке - сохрани рилс и положи файл в папку Референсы (или пришли сюда)».
 
 ## 3. Deliver
-Send the `video` path from the JSON with SendUserFile. Then 2–3 lines: length, which clips became the talk, language. One offer: «Могу поменять шрифт, цвет, заголовок или поставить фото на нужные слова».
+Send the `video` path from the JSON with SendUserFile (folder mode: just say where it is). Then 2–3 lines: length, which clips became the talk, language. One offer: «Могу поменять шрифт, цвет, заголовок или поставить фото на нужные слова».
 
 ## 4. If it fails
 Read only the last 15 lines of `grin/grin.log`. Explain in plain words with the fix, never a traceback:
