@@ -11,6 +11,8 @@ Save the person's limits: the script measures pace, colour and music; you look a
 
 **Folder «Монтаж Claude»:** if the person's computer folder is connected (see the auto-edit skill, section 0), take the reference from `Референсы/` (the one they name, else the newest) and run the same commands there with `device_bash` in `$HOME/grin`; the style is saved in `$HOME/grin/styles/` and used for the next reels in this chat.
 
+**Colour is NOT copied by default** (another light easily turns skin green or grey). Add `--colour` only when the person asks for the colour/look of the reference; it is applied at 40 %. Then check one frame of the result: skin must look like skin.
+
 **3-5 reels are better than one** when they are by the same creator: pass them all in one command; pace, colour and music become their common style, and the picture shows 8 frames across all of them. In the folder mode take every file in `Референсы/` (or the ones the person names). Don't mix different creators unless asked.
 
 ## Quick mode - just someone else's finished reel (use this by default)

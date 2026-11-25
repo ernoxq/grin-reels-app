@@ -43,6 +43,7 @@ def drop_phrases(words: list[dict], phrases: list[str]) -> list[dict]:
 def plan_text(job: Path) -> str:
     spec = json.loads((job / "spec.json").read_text())
     words = json.loads((job / "words.json").read_text())
+    raw_words = words
     if (job / "words_edit.json").exists():
         words = json.loads((job / "words_edit.json").read_text())
     parts = json.loads((job / "story_parts.json").read_text()) if (job / "story_parts.json").exists() else []
@@ -59,7 +60,7 @@ def plan_text(job: Path) -> str:
                 return o + (mid - a)
         return None
 
-    raw = (words[-1]["end"] - words[0]["start"]) if words else 0
+    raw = (raw_words[-1]["end"] - raw_words[0]["start"]) if raw_words else 0
     lines = [f"Длина: {spec['duration']:.0f} с (сырое видео {raw:.0f} с). Язык: {spec.get('lang', '?')}."]
     if spec.get("title", {}).get("lines"):
         lines.append(f"Заголовок: «{' '.join(spec['title']['lines'])}»")
@@ -73,6 +74,15 @@ def plan_text(job: Path) -> str:
             kept.append((min(x for x in ts if x is not None), txt))
         else:
             cut.append(txt)
+    args = json.loads((job / "auto_args.json").read_text()) if (job / "auto_args.json").exists() else {}
+    if args.get("script") and Path(args["script"]).exists():  # the person's own text: show it, spelling is theirs
+        lines.append("Остаётся (по твоему тексту, лучшие дубли):")
+        lines += [f"{i}. {l.strip()}" for i, l in enumerate(
+            [l for l in Path(args["script"]).read_text(encoding="utf-8").splitlines() if l.strip()], 1)]
+        if spec.get("broll"):
+            lines.append("Вставки: " + ", ".join(f"{Path(spec['sources'][b['src']]).name} на {b['start']:.0f} с"
+                                                 for b in sorted(spec["broll"], key=lambda b: b["start"])))
+        return "\n".join(lines)
     lines.append("Остаётся:")
     for i, (t0, txt) in enumerate(kept, 1):
         nxt = kept[i][0] if i < len(kept) else spec["duration"]

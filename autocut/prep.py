@@ -21,6 +21,21 @@ def _natural(p: Path):
     return [int(t) if t.isdigit() else t.lower() for t in re.split(r"(\d+)", p.name)]
 
 
+def _created(p: Path) -> str:
+    r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format_tags=creation_time:stream_tags=creation_time",
+                        "-of", "csv=p=0", str(p)], capture_output=True, text=True)
+    vals = [v.strip() for v in r.stdout.replace(",", "\n").splitlines() if v.strip()]
+    return min(vals) if vals else ""
+
+
+def order_by_recording(files: list[Path]) -> list[Path]:
+    """Talking parts in the order they were filmed (camera time); file names when the time is missing."""
+    times = {f: _created(f) for f in files}
+    if all(times.values()) and len(set(times.values())) == len(files):
+        return sorted(files, key=lambda f: times[f])
+    return sorted(files, key=_natural)
+
+
 def _probe(p: Path) -> dict:
     r = subprocess.run(["ffprobe", "-v", "error", "-show_entries", "format=duration:stream=codec_type",
                         "-of", "json", str(p)], capture_output=True, text=True)
@@ -76,9 +91,14 @@ def sort_files(files: list[str], talking: list[str] | None = None, all_talking: 
     imgs = [p for p in paths if p.suffix.lower() in IMAGE]
     if all_talking:
         story = list(vids)
-    elif talking:  # the person said which ones are the story
-        names = {Path(t).name.lower() for t in talking}
-        story = [v for v in vids if v.name.lower() in names or any(n in v.name.lower() for n in names)]
+    elif talking:  # the person said which ones are the story - and in which order
+        story = []
+        for t in talking:
+            n = Path(t).name.lower()
+            for v in vids:
+                if v not in story and (v.name.lower() == n or n in v.name.lower()):
+                    story.append(v)
+                    break
     else:
         story = []
         for v in vids:
@@ -88,9 +108,12 @@ def sort_files(files: list[str], talking: list[str] | None = None, all_talking: 
             sp = speech_seconds(v)
             if sp >= 3 and sp / info["dur"] >= 0.5 and face_share(v, info["dur"]) != 0:
                 story.append(v)
-        if not story and vids:
-            story = [max(vids, key=lambda v: _probe(v)["dur"])]
-    story.sort(key=_natural)
+        if not story:  # nobody clearly talks: take the longest clip that has sound at all
+            voiced = [v for v in vids if _probe(v)["audio"]]
+            if voiced:
+                story = [max(voiced, key=lambda v: _probe(v)["dur"])]
+    if not talking:
+        story = order_by_recording(story)
     inserts = [str(p) for p in paths if p not in story and (p in vids or p in imgs)]
     return {"story": [str(p) for p in story], "inserts": inserts}
 

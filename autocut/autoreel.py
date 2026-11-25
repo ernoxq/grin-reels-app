@@ -113,7 +113,9 @@ def select_takes(phrases: list[Phrase], script: list[str] | None = None, thr: fl
         restart = [q for q in nxt if _sim(head, q.norm[: len(head)]) > 0.75]
         cp = content(p)
         retold = [q for q in nxt if len(cp) >= 3 and len(cp & content(q)) >= 0.5 * len(cp)]
-        if restart or retold or junk(p):
+        echo = len(p.words) <= 3 and cp | {w for w in p.norm.split()} and all(
+            w in " ".join(q.norm for q in nxt[:2]) for w in p.norm.split())  # "ловить." then "...ловить яркие эмоции"
+        if restart or retold or junk(p) or echo:
             continue
         keep.append(p)
     return keep
@@ -383,12 +385,12 @@ def run(aroll: str, broll: list[str], style_path: str, out_dir: str, script: str
     out.mkdir(parents=True, exist_ok=True)
     style = json.loads(Path(style_path).read_text())
     refs = style.get("aroll_look", {}).get("lut_ref")
-    if refs:  # style learned from a reference reel: build this video's LUT toward the reference colour
+    if refs and style["aroll_look"].get("use_ref_colour", True):  # style learned from a reference reel: build this video's LUT toward the reference colour
         from .lutmatch import build
         lib = app_root() / "library"
         nm = f"auto_{out.name}"
         build(Path(aroll), [lib / r for r in refs], lib / "luts/my" / f"{nm}.cube",
-              strength=style["aroll_look"].get("lut_strength", 0.7))
+              strength=style["aroll_look"].get("lut_strength", 0.5))
         style["aroll_look"] = dict(style["aroll_look"], lut=f"luts/my/{nm}")
         style["broll_look"] = dict(style.get("broll_look", {}), color=f"luts/my/{nm}")
     if style.get("aroll_look", {}).get("wb") == "auto":  # white point: make whites white for this video

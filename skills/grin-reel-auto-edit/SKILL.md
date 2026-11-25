@@ -70,6 +70,20 @@ Each is a separate clip in the CapCut / DaVinci project, so it stays editable. D
 
 **Reference by link:** `python -m autocut fetch URL --out <Референсы or refs>`. If it answers `network` or `login`, tell the person: «Не могу скачать по ссылке - сохрани рилс и положи файл в папку Референсы (или пришли сюда)».
 
+## Colour: natural by default (strict)
+- The default style `natural` keeps real colours: a gentle white-balance nudge (only if there is something white/grey in the shot), +8 % contrast, +6 % saturation. Do not add a LUT, filter or "cinematic look" unless the person asks.
+- Asked for a look («теплее», «как плёнка», «кино»): one preset at 60 % (`apply_choices` with `lut` and `lut_strength` 0.4-0.7, reference.md D). Never stack a preset + sliders + a reference colour.
+- Small wishes go to sliders, max ±0.3: «чуть теплее» `temp 0.2`, «светлее» `exposure 0.2`, «сочнее» `saturation 0.2`.
+- Colour from a reference reel only when the person asks for that colour: `style-from-ref ... --colour` (applied at 40 %). By default a learned style copies pace, captions and music, not the colour.
+- After any colour change look at ONE frame (`ffmpeg -ss 3 -i final.mp4 -frames:v 1 -vf scale=360:-2 f.png`). Skin must look like skin; if it went green, grey, orange or too dark, halve the strength and render again.
+
+## Flexibility: what to do with any wish
+- About the content (what stays, order, words, title): storyboard flags `--drop`, `--keep`, `--fix`, `--title`, `--talking` (order of the parts = order you list them).
+- Something on screen at certain words: `place` (photo, video window, icon, sticker) or `place --motion` (animated text).
+- Fonts, colours, music, end button, captions look: `apply_choices` / style fields (reference.md B-D).
+- The person's whole vibe from 1-5 reels: style-learn skill.
+- Anything the engine has no option for: do it as a small extra step on `final.mp4` with ffmpeg (one command, `-loglevel error`), or tell them it is a manual touch in CapCut - the project is there.
+
 ## 3. Deliver
 Send the `video` path from the JSON with SendUserFile (folder mode: just say where it is). Then 2–3 lines: length, which clips became the talk, language. One offer: «Могу поменять шрифт, цвет, заголовок или поставить фото на нужные слова».
 

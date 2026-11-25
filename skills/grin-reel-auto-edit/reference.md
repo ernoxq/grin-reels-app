@@ -63,7 +63,7 @@ Good pairs to suggest:
 - 05 Плёнка, 06 Пастель, 07 Сочный, 08 Матовый;
 - 09 Тёмный и глубокий, 10 Золотой час, 11 Ч/Б мягкий, 12 Ч/Б контрастный.
 
-Set one with `lut: "luts/presets/04_teal_orange"`.
+Set one with `apply_choices(style, {"lut": "luts/presets/04_teal_orange", "lut_strength": 0.6})` - 0.4 subtle, 0.6 normal, 0.8 strong; full strength is almost always too much.
 
 **White point:** choices `{"wb": "auto"}` neutralises colour casts for each video.
 

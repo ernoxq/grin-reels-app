@@ -70,7 +70,7 @@ def _measure(ref: Path) -> dict:
             "music": _music_under_voice(ref)}
 
 
-def learn(ref, name: str, base: str = "warm_intro") -> dict:
+def learn(ref, name: str, base: str = "natural", colour: bool = False) -> dict:
     """ref = one reel or a list of 1-5 reels by the same creator: the style is their common denominator."""
     refs_in = [Path(r) for r in (ref if isinstance(ref, (list, tuple)) else [ref])][:5]
     ms = [_measure(r) for r in refs_in]
@@ -117,6 +117,9 @@ def learn(ref, name: str, base: str = "warm_intro") -> dict:
     style["aroll_look"] = {k: v for k, v in style["aroll_look"].items() if k not in ("lut", "input_luma")}
     style["aroll_look"]["lut_ref"] = refs
     style["broll_look"] = dict(style.get("broll_look", {}), lut_ref=refs)
+    # colour is copied only on request: a reference shot in another light easily turns skin green or grey
+    style["aroll_look"]["use_ref_colour"] = bool(colour)
+    style["aroll_look"]["lut_strength"] = 0.4
     br = style.setdefault("broll_rules", {})
     br["cut_len"] = round(min(2.5, max(0.35, cut_len)), 2)
     br["looks"] = ["color", "bw"] if sum(bw) >= max(1, len(bw) // 6) else ["color"]

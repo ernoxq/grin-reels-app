@@ -105,7 +105,7 @@ def main() -> None:
     au = sub.add_parser("auto", help="ALL files from the chat -> one finished reel (joins every talking part)")
     au.add_argument("files", type=Path, nargs="+")
     au.add_argument("--talking", nargs="*", help="names of the clips where the person talks (default: detect)")
-    au.add_argument("--style", type=Path, default=ROOT / "styles/warm_intro.json")
+    au.add_argument("--style", type=Path, default=ROOT / "styles/natural.json")
     au.add_argument("--script", type=Path)
     au.add_argument("--title")
     au.add_argument("--lang")
@@ -141,7 +141,8 @@ def main() -> None:
     lr = sub.add_parser("style-from-ref", help="learn a style from 1-5 finished reels (no source clips)")
     lr.add_argument("reference", type=Path, nargs="+")
     lr.add_argument("--name", required=True)
-    lr.add_argument("--base", default="warm_intro")
+    lr.add_argument("--base", default="natural")
+    lr.add_argument("--colour", action="store_true", help="also copy the colour (only when the person asks for it)")
 
     ic = sub.add_parser("icon", help="GRIN icon -> PNG sticker (any colour)")
     ic.add_argument("name"); ic.add_argument("--out", type=Path); ic.add_argument("--size", type=int, default=256)
@@ -233,7 +234,13 @@ def main() -> None:
             from .fetch_model import fetch
             model = str(fetch())
         prev0 = json.loads((a.out / "auto_args.json").read_text()) if (a.out / "auto_args.json").exists() else {}
-        a.title = a.title or prev0.get("title")
+        a.title = a.title or prev0.get("title")  # a re-plan keeps everything said before unless changed now
+        a.deliver = a.deliver or (Path(prev0["deliver"]) if prev0.get("deliver") else None)
+        a.name = a.name or prev0.get("name")
+        a.export = a.export or prev0.get("export") or ""
+        a.capcut_root = a.capcut_root or (Path(prev0["capcut_root"]) if prev0.get("capcut_root") else None)
+        a.map = a.map or prev0.get("map") or []
+        a.lang = a.lang or prev0.get("lang")
         args = dict(inserts=[] if a.no_inserts else srt["inserts"], style=str(a.style),
                     script=str(a.script) if a.script else None, title=a.title, model=model, lang=a.lang,
                     deliver=str(a.deliver) if a.deliver else None, name=a.name, export=a.export,
@@ -285,7 +292,7 @@ def main() -> None:
         print(json.dumps(from_frame(a.frame)))
     elif a.cmd == "style-from-ref":
         from .reflearn import learn
-        print(json.dumps(learn(a.reference, a.name, a.base), ensure_ascii=False))
+        print(json.dumps(learn(a.reference, a.name, a.base, a.colour), ensure_ascii=False))
     elif a.cmd == "icon":
         from .icons import render
         out = a.out or ROOT / "library/stickers/my" / f"icon_{a.name}.png"
@@ -321,4 +328,17 @@ def main() -> None:
 
 
 if __name__ == "__main__":
-    main()
+    import sys
+    try:
+        main()
+    except SystemExit:
+        raise
+    except Exception as e:  # one short line for Claude; the traceback goes to the log (stderr)
+        import traceback
+        traceback.print_exc()
+        msg = str(e)
+        hint = ("не хватило памяти - пришли видео короче или в 1080p" if isinstance(e, MemoryError)
+                else "файл не читается - пришли его ещё раз или в другом формате" if "Invalid data" in msg
+                or "moov atom" in msg else "ошибка движка - подробности в grin.log")
+        print(json.dumps({"error": type(e).__name__, "hint": hint}, ensure_ascii=False))
+        sys.exit(1)
