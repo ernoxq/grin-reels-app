@@ -1,4 +1,0 @@
-# Full-frame overlays laid over the whole edit (under captions).
-[files."bottom_shadow.png"]
-tags = ["shadow", "readability"]
-# Reproduces CapCut "Тени" layer from the reference: black gradient from y=52% (0%) to bottom (65%).

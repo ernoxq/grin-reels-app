@@ -156,6 +156,8 @@ def main() -> None:
     so.add_argument("--capcut", help="also write a layered CapCut project with this name")
     so.add_argument("--capcut-root"); so.add_argument("--media-dir"); so.add_argument("--map", nargs="*", default=[])
     sub.add_parser("studio-help", help="scene types for scenes.json")
+    stt = sub.add_parser("studio-theme", help="studio colours (bg, accent, ink) from reference reels -> theme JSON")
+    stt.add_argument("refs", nargs="+")
     pl = sub.add_parser("place", help="put a photo/video/icon on top at the given words, then re-render")
     pl.add_argument("spec"); pl.add_argument("file", nargs="?")
     pl.add_argument("--words"); pl.add_argument("--at", type=float); pl.add_argument("--dur", type=float)
@@ -307,6 +309,9 @@ def main() -> None:
     elif a.cmd == "icons":
         from .icons import export_svgs, sheet
         export_svgs(); print(sheet(ROOT / "library/icons/_sheet.png"))
+    elif a.cmd == "studio-theme":
+        from .studio import theme_from_ref
+        print(json.dumps(theme_from_ref(a.refs)))
     elif a.cmd == "studio-help":
         from .studio import SCENES
         print(SCENES)

@@ -1,6 +1,6 @@
 ---
 name: grin-reel-auto-edit
-description: Make a finished vertical reel (Instagram/TikTok/Shorts) from whatever videos and photos the person drops into the chat — joins all talking parts, cuts pauses and bad takes, adds subtitles in the spoken language, title, colour, inserts and an end button — with the GRIN Reels engine bundled in this skill. Use for «собери рилс», «смонтируй видео», «сделай рилс из этого».
+description: Make a finished vertical reel (Instagram/TikTok/Shorts) from whatever videos and photos the person drops into the chat — joins all talking parts, cuts pauses and bad takes, adds subtitles in the spoken language, title, colour, inserts, motion graphics, or a studio look (speaker cut out on a light set with animated cards) — with the GRIN Reels engine bundled in this skill. Use for «собери рилс», «смонтируй видео», «сделай рилс из этого», «вырежи меня на фон с карточками», «добавь анимацию / надпись», «поставь фото на слова», and any change to a reel made with GRIN.
 ---
 
 <!-- GRIN Reels skill — © 2026 Ernest Grin (GRIN studio). All rights reserved. Licensed to the buyer for personal use; redistribution or resale prohibited. -->
@@ -14,6 +14,31 @@ The engine makes every editing decision. Your job is to run ONE command and send
 - Do not look at the video or make contact sheets. Do not explain the steps.
 - Before working, write one line: «Собираю рилс, это займёт несколько минут». After, at most 3 short lines.
 - Never re-run the whole build for a small change: edit the spec and `render` (see reference.md, F).
+
+## Understanding the request (read first, every time)
+Do exactly what was asked, change nothing else, and keep earlier decisions. Before a build or re-render that takes minutes, say in one line what you understood: «Понял: убираю фразу про X, субтитры делаю жёлтыми, остальное как было». If a wish can mean two different results, ask ONE short question with 2–3 concrete options instead of guessing; never guess texts that will appear on screen.
+
+| The person says | Do |
+|---|---|
+| «собери / смонтируй рилс», «сделай видео из этого» | auto-edit, storyboard first (section 2) |
+| «сразу», «без плана», «не спрашивай» | skip `--plan`, build in one go |
+| «в таком стиле», «как этот ролик», + a reel | style-learn: Step 0 (look at the whole reference), then the matching mode |
+| «студийный стиль», «вырежи меня», «на светлом фоне с карточками» | Studio mode |
+| «добавь анимацию / надпись на словах …» | `place --motion` on those words (texts approved first) |
+| «поставь фото / видео / иконку, когда говорю …» | `place` on those words |
+| «убери фразу / кусок про …» / «верни …» | `--drop "…"` / `--keep "…"` |
+| «в субтитрах ошибка: … → …» | `--fix "wrong=right"` (several words are fine) |
+| «другой заголовок: …» | `--title "…"` (studio: the `title` card) |
+| «сделай короче, до N секунд» | drop the weakest sentences until it fits, show the plan |
+| «субтитры выше / ниже / крупнее / жёлтые / другим шрифтом» | caption style (studio: `theme.caption_y`, `theme.caption`); keep inside the safe band 270–1495 and say so if asked lower |
+| «закрывает лицо», «текст на лице» | `--pos auto` (default) or move the card up; studio: cards stay above the head |
+| «теплее / светлее / сочнее» | one slider, ±0.2 (Colour section) |
+| «музыку тише / другую / без музыки» | music in the style (reference.md, D) |
+| «вставь моё фото в карточку» | studio `name` card `photo` (the file they sent) |
+| «натуральнее», «не надо всё в белое», «руки обрезаны» | studio: no white fade; ask for the wide take (`--video`) |
+| «хочу редактировать в CapCut» | folder mode `--export capcut` / studio `--capcut` |
+| «покажи, что будет» | `--plan` (and `studio --plan`), no render |
+| something you cannot do | say so in one line and offer the nearest thing you can do |
 
 ## 0. Folder mode: «Монтаж Claude» on the person's computer (check first)
 If the session has `mcp__remote-devices__*` tools, call `get_device_info`. If a connected folder contains `Исходники` (or the person names their editing folder), work there and do NOT ask them to attach files:
@@ -71,7 +96,16 @@ Each is a separate clip in the CapCut / DaVinci project, so it stays editable. D
 
 **Reference by link:** `python -m autocut fetch URL --out <Референсы or refs>`. If it answers `network` or `login`, tell the person: «Не могу скачать по ссылке - сохрани рилс и положи файл в папку Референсы (или пришли сюда)».
 
-**Studio format** (speaker cut out of the room on a light set + cards, like many "expert" reels): use the `grin-reel-studio` skill on the same job. Tip for the person: film with room on both sides and down to the table; a tight vertical crop leaves straight edges on the cut-out.
+## Studio mode: speaker cut out on a light set + animated cards (built in)
+Use it when the person asks for it («студийный стиль», «вырежи меня на фон с карточками») or a reference is in this format (the style-learn skill tells). Same job, extra command; everything is in this engine.
+1. Build the talk as usual (section 2) and `finish` it once - the studio uses its cuts, captions and sound. Fix recognition with `--fix` first.
+2. Ask only for what is missing: the person's photo and name/role for the name plate, and **the widest take of the same recording** (horizontal is best; `--video`, aligned by sound automatically). With only a tight vertical crop say once: «по бокам будут ровные срезы - лучше снимать с запасом по бокам и до стола».
+3. Colours: default dark green on light grey. From a reference: `python -m autocut studio-theme REF.mp4` → put the JSON into `"theme"`. On request: `"theme": {"accent": "#...", "bg": "#...", "caption": "#..."}`.
+4. Write `scenes.json` from the meaning of the speech (`python -m autocut studio-help` lists every card): a title for the first 3 s, the name plate with the photo, a `typewriter` for any quoted verse/quote in sync with the speech, `bible` when the Bible is named, `checklist` for lists (ticks on the words), `rows` for ✓/✗ contrasts, `headline`/`giant` for punchlines, `icon_card` for «напишите в комментариях», `end` with «Сохранить». One idea per card, 2–7 s, on the words where it is said (`from`/`to`/`at` are phrases from the captions); leave 1–2 gaps without cards.
+5. `python -m autocut studio grin/jobs/r1 --scenes scenes.json --plan` → send the list as it is: «Ставлю такие карточки - что поменять?». The texts are yours, so they must approve them.
+6. Render: `nohup python -m autocut studio grin/jobs/r1 --scenes scenes.json --video WIDE.MOV > grin/out.txt 2>&1 &` (cut-out ~3 min per minute of video on 2 cores, render ~2 min) → `jobs/r1/studio/studio.mp4`. Check 4 frames once: cards never on the face, captions readable. Pass on any `tips` from the JSON in one sentence.
+7. CapCut, when asked: add `--capcut "<name>" --capcut-root ".../com.lveditor.draft" --media-dir ".../GRIN media/<name>" [--map LOCAL=REAL]` - every card is its own transparent clip, the speaker a clip with scale/position keyframes, captions are CapCut text. The speaker layer is ~1 GB per minute: check disk space first. Card contents (typed text, Bible, ticks) stay baked in their clip.
+Built in: yellow captions with outline inside the safe band, cards below the top UI, the speaker shrinks under a card and grows back, glitch-in at the start. The matting model (RVM, GPL-3.0) is downloaded on first use.
 
 **Safe zones:** captions, titles and graphics stay inside the Reels/TikTok/Shorts safe band (y 270–1495 of 1920). Never move them lower than that on request without warning that the app's caption and buttons will cover them.
 
@@ -86,7 +120,7 @@ Each is a separate clip in the CapCut / DaVinci project, so it stays editable. D
 - About the content (what stays, order, words, title): storyboard flags `--drop`, `--keep`, `--fix`, `--title`, `--talking` (order of the parts = order you list them).
 - Something on screen at certain words: `place` (photo, video window, icon, sticker) or `place --motion` (animated text).
 - Fonts, colours, music, end button, captions look: `apply_choices` / style fields (reference.md B-D).
-- The person's whole vibe from 1-5 reels: style-learn skill.
+- The person's whole vibe from 1-5 reels: style-learn skill. Cut-out-on-a-set look with cards: Studio mode above.
 - Anything the engine has no option for: do it as a small extra step on `final.mp4` with ffmpeg (one command, `-loglevel error`), or tell them it is a manual touch in CapCut - the project is there.
 
 ## 3. Deliver

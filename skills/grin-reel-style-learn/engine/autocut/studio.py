@@ -894,3 +894,38 @@ def capcut(job: Path, scenes_p: Path, name: str, draft_root: Path, media: Path, 
         for f in folder.glob("*.json"):
             f.write_text(f.read_text().replace(a_, b_))
     return {"capcut": str(folder), "media": str(media), "layers": len(clips) + 3}
+
+
+# ---------------------------------------------------------------- colours from a reference
+def theme_from_ref(paths: list[str]) -> dict:
+    """Background, accent and ink colours of a studio-style reference (one or several reels)."""
+    px = []
+    for p in paths:
+        r = subprocess.run(["ffmpeg", "-v", "error", "-i", str(p), "-vf", "fps=1,scale=96:-2", "-f", "rawvideo", "-pix_fmt", "rgb24", "-"],
+                           capture_output=True)
+        a = np.frombuffer(r.stdout, np.uint8)
+        if a.size: px.append(a.reshape(-1, 3))
+    if not px: return {}
+    X = np.concatenate(px).astype(np.float32)
+    mx, mn = X.max(1), X.min(1)
+    sat = (mx - mn) / np.maximum(mx, 1)
+    lum = X @ np.array([0.299, 0.587, 0.114], np.float32)
+
+    def mode(sel):
+        q = (X[sel] // 8).astype(int)
+        if not len(q): return None
+        keys, cnt = np.unique(q[:, 0] * 1024 + q[:, 1] * 32 + q[:, 2], return_counts=True)
+        k = keys[np.argmax(cnt)]
+        c = np.array([k // 1024, (k // 32) % 32, k % 32]) * 8 + 4
+        return "#%02X%02X%02X" % tuple(int(v) for v in c)
+
+    th = {}
+    bg = mode(lum > 200)
+    if bg: th["bg"] = bg
+    acc = mode((sat > 0.25) & (lum > 25) & (lum < 120))
+    if acc:
+        th["accent"] = acc
+        c = rgb(acc); th["accent2"] = "#%02X%02X%02X" % tuple(min(255, int(v * 1.45)) for v in c)
+    ink = mode((lum < 45) & (sat < 0.35))
+    if ink: th["ink"] = ink
+    return th

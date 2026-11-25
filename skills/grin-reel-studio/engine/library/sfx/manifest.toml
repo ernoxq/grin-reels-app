@@ -1,7 +1,0 @@
-# Sub-folder name = tag (sfx/whoosh/*.wav -> "whoosh"). Volume is linear (1.0 = as recorded).
-[defaults]
-volume = 0.8
-
-[files."impact_big.wav"]
-tags = ["impact"]
-volume = 0.6
