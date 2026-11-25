@@ -93,12 +93,27 @@ def select_takes(phrases: list[Phrase], script: list[str] | None = None, thr: fl
             if best:
                 keep.append(respell(best[1], line))
         return keep
-    # no script: a phrase is a failed take if a later phrase starts the same way
+    # no script: drop failed takes, false starts and mumbled fragments; the LAST good take wins
+    def content(p: Phrase) -> set[str]:
+        return {w for w in p.norm.split() if len(w) >= 4}
+
+    def junk(p: Phrase) -> bool:
+        n = len(p.words)
+        prob = sum(w.prob for w in p.words) / max(1, n)
+        last = p.words[-1].text.strip() if p.words else ""
+        trails = last.endswith(("...", "…", "-", "—"))
+        return (prob < 0.45
+                or (n <= 3 and (prob < 0.7 or last.endswith("?") or trails))
+                or (trails and n <= 7))
+
     keep = []
     for i, p in enumerate(phrases):
         head = p.norm[: max(12, int(len(p.norm) * 0.6))]
-        later = [q for q in phrases[i + 1:i + 6] if _sim(head, q.norm[: len(head)]) > 0.75]
-        if later or len(p.words) < 2 and p.words[0].prob < 0.5:
+        nxt = phrases[i + 1:i + 6]
+        restart = [q for q in nxt if _sim(head, q.norm[: len(head)]) > 0.75]
+        cp = content(p)
+        retold = [q for q in nxt if len(cp) >= 3 and len(cp & content(q)) >= 0.5 * len(cp)]
+        if restart or retold or junk(p):
             continue
         keep.append(p)
     return keep
@@ -399,6 +414,14 @@ def run(aroll: str, broll: list[str], style_path: str, out_dir: str, script: str
             except Exception:
                 from .fetch_model import fetch
                 words = transcribe(aroll, out / "words.json", str(fetch()), lang)
+    merged: list[Word] = []
+    for w in words:  # Romanian/French clitics come split by ASR: "ne -a" -> "ne-a", "S -o" -> "S-o"
+        if merged and w.text.startswith("-") and len(w.text) > 1 and w.start - merged[-1].end < 0.3:
+            m = merged[-1]
+            merged[-1] = Word(m.text + w.text, m.start, w.end, min(m.prob, w.prob))
+        else:
+            merged.append(w)
+    words = merged
     spec = plan(Path(aroll).resolve(), [Path(b).resolve() for b in broll], style, words, lines, title)
     if (lf := out / "lang.txt").exists():
         spec["lang"] = lf.read_text().strip()

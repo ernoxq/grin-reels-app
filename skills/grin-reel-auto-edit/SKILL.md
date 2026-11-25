@@ -44,7 +44,7 @@ Real paths come from `get_device_info.connectedFolders`. Poll: `sleep 170; tail 
 nohup bash grin/run.sh <ALL attached videos and photos, absolute paths> --plan --out grin/jobs/r1 [options] > grin/out.txt 2>&1 &
 ```
 Wait cheaply: `sleep 120; tail -25 grin/out.txt` until the plan appears (about 1.5 min per minute of raw video).
-Show the plan to the person as it is (it is short: kept sentences with times, inserts, what was cut, title) and ask: «Собираю так или что-то поменять?». Apply what they say, re-plan (fast, speech is not recognised again), show again:
+Before showing it, fix obvious speech-recognition mistakes yourself with `--fix "wrong=right"` (one word each, e.g. `"anuarii=ianuarie"`; you know the language) and re-plan once. If a kept sentence is clearly a stumble or a repeat of a later one, drop it with `--drop`. Then show the plan to the person as it is (it is short: kept sentences with times, inserts, what was cut, title) and ask: «Собираю так или что-то поменять?». Apply what they say, re-plan (fast, speech is not recognised again), show again:
 - cut a phrase: `--drop "фраза"` (undo: `--keep "фраза"`); other title: `--title "..."`;
 - photo / video / icon on certain words: `place` (reference.md, E); animated text: `place --motion` (below);
 - run the same command with the same `--out` and the new options; earlier drops and title are remembered. A new reel gets a new `--out` (r2, r3...).
@@ -55,6 +55,7 @@ Options (add only if the person said so):
 - `--all-talking` - «соедини все», or all clips are the person talking; `--talking IMG_1 IMG_4` - only these are the talk.
 - `--lang ro` / `ru` / `en` - only if subtitles came out in the wrong language. `--script script.txt` - exact text.
 - `--no-inserts`.
+- There is NO end button by default. Add one only if asked (reference.md, D: `cta_icon` / `cta`).
 
 The engine itself joins every talking clip in file-name order, removes repeats, pauses and mistakes, spreads the other files evenly as inserts (never on the title or the end), detects the language.
 

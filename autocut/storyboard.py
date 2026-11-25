@@ -69,7 +69,7 @@ def plan_text(job: Path) -> str:
         ts = [out_time(w) for w in s]
         txt = " ".join(w["text"] for w in s)
         if any(x is not None for x in ts):
-            txt = " ".join(w["text"] for w, x in zip(s, ts) if x is not None)
+            txt = " ".join(w["text"] for w, x in zip(s, ts) if x is not None).replace(" -", "-")
             kept.append((min(x for x in ts if x is not None), txt))
         else:
             cut.append(txt)
@@ -89,3 +89,24 @@ def plan_text(job: Path) -> str:
     if spec.get("sticker", {}).get("asset"):
         lines.append(f"Конец: кнопка на {spec['sticker']['start']:.1f} с")
     return "\n".join(lines)
+
+
+def fix_words(words: list[dict], fixes: list[str]) -> list[dict]:
+    """--fix "вадим=свадебный" "anuarii=ianuarie": exact word replacements (case kept for the first letter)."""
+    pairs = []
+    for f in fixes:
+        if "=" in f:
+            a, b = f.split("=", 1)
+            pairs.append((_norm(a), b.strip()))
+    out = []
+    for w in words:
+        t = w["text"]
+        core = _norm(t)
+        for a, b in pairs:
+            if core == a:
+                tail = t[len(t.rstrip(".,!?:;…")):]
+                b2 = b[:1].upper() + b[1:] if t[:1].isupper() else b
+                t = b2 + tail
+                break
+        out.append(dict(w, text=t))
+    return out

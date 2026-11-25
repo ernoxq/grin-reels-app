@@ -120,6 +120,7 @@ def main() -> None:
     au.add_argument("--plan", action="store_true", help="storyboard only: print the plan, render later with `finish`")
     au.add_argument("--drop", nargs="*", default=[], help="phrases whose sentences must be cut (kept between re-plans)")
     au.add_argument("--keep", nargs="*", default=[], help="undo an earlier --drop")
+    au.add_argument("--fix", nargs="*", default=[], help='wrongly recognised words: "wrong=right" (kept between re-plans)')
     au.add_argument("--no-inserts", action="store_true", help="talking parts only, no B-roll")
 
     rd = sub.add_parser("render", help="render a reel spec.json (after hand edits)")
@@ -243,11 +244,14 @@ def main() -> None:
         prev = json.loads((a.out / "auto_args.json").read_text()) if (a.out / "auto_args.json").exists() else {}
         drops = [d for d in prev.get("drop", []) if d not in a.keep] + [d for d in a.drop if d not in prev.get("drop", [])]
         args["drop"] = drops
-        if drops:
+        fixes = [f for f in prev.get("fix", []) if f.split("=")[0] not in {x.split("=")[0] for x in a.fix}] + a.fix
+        args["fix"] = fixes
+        if drops or fixes:
             a.drop = drops
-            from .storyboard import drop_phrases
+            from .storyboard import drop_phrases, fix_words
             w = json.loads((a.out / "words.json").read_text())
-            (a.out / "words_edit.json").write_text(json.dumps(drop_phrases(w, a.drop), ensure_ascii=False))
+            (a.out / "words_edit.json").write_text(json.dumps(drop_phrases(fix_words(w, fixes), a.drop),
+                                                              ensure_ascii=False))
             spec_path = run(str(main), args["inserts"], args["style"], str(a.out), script=args["script"],
                             title=a.title, words_json=str(a.out / "words_edit.json"), language=a.lang)
             _split(spec_path, parts)

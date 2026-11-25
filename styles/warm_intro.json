@@ -53,14 +53,6 @@
    }
   }
  },
- "sticker": {
-  "asset": "stickers/cta/message_button.png",
-  "width": 0.366,
-  "x": 0.0,
-  "y": -0.2625,
-  "pop": 0.4,
-  "capcut_scale": 0.37
- },
  "fade_out": 0.53,
  "music": {
   "asset": null,
