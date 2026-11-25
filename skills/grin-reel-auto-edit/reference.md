@@ -16,7 +16,7 @@ People send files in the chat and say what they want. Put each file into the rig
 - **End sticker or button (PNG):** copy it to `library/stickers/my/` and set `cta`. It pops on the last phrase.
 
 ## C. Any look from one reference reel or a few words
-**One finished reel someone else made** (no source clips): run `python -m autocut style-from-ref REF.mp4 --name ref_x`. It measures the editing pace, the B&W share and music under the voice. It saves colour reference frames, so each new video gets its own LUT toward that colour automatically. It writes `styles/ref_x.json`. Then open `library/looks/ref_x/sheet.png` once and set what only eyes can judge, editing only `caption_style`, `title` and `sticker` in that style file:
+**One finished reel someone else made** (no source clips): run `python -m autocut style-from-ref REF1.mp4 [REF2.mp4 ... up to 5] --name ref_x`. It measures the editing pace, the B&W share and music under the voice. It saves colour reference frames, so each new video gets its own LUT toward that colour automatically. It writes `styles/ref_x.json`. Then open `library/looks/ref_x/sheet.png` once and set what only eyes can judge, editing only `caption_style`, `title` and `sticker` in that style file:
 - caption mode: `phrase` = short phrases; `words` = 1–3 big words with the spoken word lit up;
 - caption font, size, color and `uppercase`;
 - `box` (a plate behind the words, `{"color":"#000000","alpha":0.55,"pad":14}`) and `pop`;

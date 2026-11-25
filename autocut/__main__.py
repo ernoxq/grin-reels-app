@@ -122,8 +122,8 @@ def main() -> None:
     sz = sub.add_parser("safe-from-frame", help="read a safe-zone frame picture (white = safe) -> JSON for style['safe_zone']")
     sz.add_argument("frame", type=Path)
 
-    lr = sub.add_parser("style-from-ref", help="learn a style from ONE finished reel (no source clips)")
-    lr.add_argument("reference", type=Path)
+    lr = sub.add_parser("style-from-ref", help="learn a style from 1-5 finished reels (no source clips)")
+    lr.add_argument("reference", type=Path, nargs="+")
     lr.add_argument("--name", required=True)
     lr.add_argument("--base", default="warm_intro")
 
@@ -259,7 +259,7 @@ def main() -> None:
         print(json.dumps(from_frame(a.frame)))
     elif a.cmd == "style-from-ref":
         from .reflearn import learn
-        print(json.dumps(learn(a.reference, a.name, a.base), ensure_ascii=False, indent=1))
+        print(json.dumps(learn(a.reference, a.name, a.base), ensure_ascii=False))
     elif a.cmd == "icon":
         from .icons import render
         out = a.out or ROOT / "library/stickers/my" / f"icon_{a.name}.png"

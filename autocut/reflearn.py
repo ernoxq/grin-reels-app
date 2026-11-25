@@ -34,10 +34,14 @@ def _cuts(p: Path, thr: float = 0.32) -> list[float]:
 
 
 def _frame(p: Path, t: float, w: int = 360) -> Image.Image:
-    raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-ss", f"{t:.3f}", "-i", str(p), "-frames:v", "1",
-                          "-vf", f"scale={w}:-2", "-f", "image2pipe", "-vcodec", "png", "-"], capture_output=True).stdout
     from io import BytesIO
-    return Image.open(BytesIO(raw)).convert("RGB")
+    for tt in (t, max(0.0, t - 0.3), max(0.0, t - 1.0)):  # a seek right at the end can return nothing
+        raw = subprocess.run(["ffmpeg", "-loglevel", "error", "-ss", f"{tt:.3f}", "-i", str(p), "-frames:v", "1",
+                              "-vf", f"scale={w}:-2", "-f", "image2pipe", "-vcodec", "png", "-"],
+                             capture_output=True).stdout
+        if raw:
+            return Image.open(BytesIO(raw)).convert("RGB")
+    return Image.new("RGB", (w, int(w * 16 / 9)), "black")
 
 
 def _sat(im: Image.Image) -> float:
@@ -53,44 +57,62 @@ def _music_under_voice(p: Path) -> bool:
     return bool(lv) and float(np.percentile(lv, 10)) > -45
 
 
-def learn(ref: Path, name: str, base: str = "warm_intro") -> dict:
+def _measure(ref: Path) -> dict:
     dur = _dur(ref)
     cuts = [c for c in _cuts(ref) if 0.15 < c < dur - 0.15]
     bounds = [0.0] + cuts + [dur]
     shots = [(a, b) for a, b in zip(bounds, bounds[1:]) if b - a > 0.08]
     frames = [(a, b, _frame(ref, (a + b) / 2)) for a, b in shots[:40]]
-    sats = [_sat(f) for _, _, f in frames]
-    bw = [s < 14 for s in sats]
+    bw = [_sat(f) < 14 for _, _, f in frames]
     lens = sorted(b - a for a, b in shots)
     short = [x for x in lens if x < 2.5] or lens  # montage shots, not the talking head
-    cut_len = float(np.median(short)) if short else 1.0
+    return {"ref": ref, "dur": dur, "shots": shots, "frames": frames, "bw": bw, "short": short,
+            "music": _music_under_voice(ref)}
 
+
+def learn(ref, name: str, base: str = "warm_intro") -> dict:
+    """ref = one reel or a list of 1-5 reels by the same creator: the style is their common denominator."""
+    refs_in = [Path(r) for r in (ref if isinstance(ref, (list, tuple)) else [ref])][:5]
+    ms = [_measure(r) for r in refs_in]
     out = ROOT / "library/looks" / name
     out.mkdir(parents=True, exist_ok=True)
-    # colour reference: the most typical colour shots (not B&W), full size
-    colour = [(a, b) for (a, b, _), w in zip(frames, bw) if not w] or [(a, b) for a, b, _ in frames]
-    refs = []
-    for i, (a, b) in enumerate(sorted(colour, key=lambda s: -(s[1] - s[0]))[:3]):
-        fp = out / f"ref_look_{i + 1}.png"
-        _frame(ref, (a + b) / 2, 720).save(fp)
-        refs.append(str(fp.relative_to(ROOT / "library")))
-    # 8 key frames only (Claude looks at them once, images are the costly part):
-    # the opening (title), 6 different shots, the end (button / sticker). Pace, colour, music are measured above.
-    mids = sorted({round((a + b) / 2, 2) for a, b, _ in sorted(frames, key=lambda f: -(f[1] - f[0]))[:6]})
-    ts = [min(0.4, dur / 2)] + mids + [max(0.0, dur - 0.5)]
+    # pace = median of all montage shots of all reels; B&W and music by majority
+    short = [x for m in ms for x in m["short"]]
+    cut_len = float(np.median(short)) if short else 1.0
+    bw = [w for m in ms for w in m["bw"]]
+    music = sum(1 for m in ms if m["music"]) * 2 >= len(ms)
+    dur = sum(m["dur"] for m in ms)
+    shots = [s for m in ms for s in m["shots"]]
+    # colour reference: the longest colour shots, spread over the reels (max 5 frames in total)
+    refs, per = [], max(1, 5 // len(ms))
+    for m in ms:
+        colour = [(a, b) for (a, b, _), w in zip(m["frames"], m["bw"]) if not w] or [(a, b) for a, b, _ in m["frames"]]
+        for a, b in sorted(colour, key=lambda s: -(s[1] - s[0]))[:per if len(ms) > 1 else 3]:
+            fp = out / f"ref_look_{len(refs) + 1}.png"
+            _frame(m["ref"], (a + b) / 2, 720).save(fp)
+            refs.append(str(fp.relative_to(ROOT / "library")))
+    # 8 key frames in total (Claude looks once; images are the costly part): opening, middle shots, end
+    picks = []
+    k = max(1, -(-8 // len(ms)))
+    for m in ms:
+        mids = sorted({round((a + b) / 2, 2) for a, b, _ in sorted(m["frames"], key=lambda f: -(f[1] - f[0]))[:max(0, k - 2)]})
+        ts = ([min(0.4, m["dur"] / 2)] + mids + [max(0.0, m["dur"] - 0.5)])[:k]
+        picks += [(m["ref"], t) for t in ts]
+    picks = picks[:8]
     tw = 200
-    tiles = [_frame(ref, t, tw) for t in ts]
+    tiles = [_frame(r, t, tw) for r, t in picks]
     cols, th = 4, tiles[0].height
     sheet = Image.new("RGB", (tw * cols, (th + 18) * ((len(tiles) + cols - 1) // cols)), "white")
     d = ImageDraw.Draw(sheet)
-    for i, (t, im) in enumerate(zip(ts, tiles)):
+    for i, ((r, t), im) in enumerate(zip(picks, tiles)):
         x, y = (i % cols) * tw, (i // cols) * (th + 18)
         sheet.paste(im, (x, y + 18))
-        d.text((x + 4, y + 3), f"{t:.1f}s", fill="black")
+        d.text((x + 4, y + 3), f"#{refs_in.index(r) + 1} {t:.1f}s", fill="black")
     sheet.save(out / "sheet.png")
+    ref = refs_in[0]
 
     style = json.loads((ROOT / "styles" / f"{base}.json").read_text())
-    style["_comment"] = f"GRIN Reels style '{name}' — learned from one reference reel ({ref.name}). © 2026 Ernest Grin."
+    style["_comment"] = f"GRIN Reels style '{name}' — learned from {len(refs_in)} reference reel(s) ({", ".join(r.name for r in refs_in)}). © 2026 Ernest Grin."
     look = f"looks/{name}"
     style["aroll_look"] = {k: v for k, v in style["aroll_look"].items() if k not in ("lut", "input_luma")}
     style["aroll_look"]["lut_ref"] = refs
@@ -98,8 +120,7 @@ def learn(ref: Path, name: str, base: str = "warm_intro") -> dict:
     br = style.setdefault("broll_rules", {})
     br["cut_len"] = round(min(2.5, max(0.35, cut_len)), 2)
     br["looks"] = ["color", "bw"] if sum(bw) >= max(1, len(bw) // 6) else ["color"]
-    music = _music_under_voice(ref)
-    rep = {"name": name, "duration": round(dur, 2), "shots": len(shots), "cut_len": br["cut_len"],
+    rep = {"name": name, "reels": len(ms), "duration": round(dur, 2), "shots": len(shots), "cut_len": br["cut_len"],
            "bw_shots": int(sum(bw)), "looks": br["looks"], "music_under_voice": music,
            "colour_refs": refs, "sheet": str((out / "sheet.png").relative_to(ROOT)),
            "todo_for_claude": [
