@@ -112,4 +112,11 @@ def join(story: list[str], out: Path, width: int = 1080, height: int = 1920, fps
            "-map", "[a]", "-c:v", "libx264", "-preset", "ultrafast", "-crf", "17", "-c:a", "aac", "-b:a", "256k",
            str(out)]
     subprocess.run(cmd, check=True)
+    # where each original clip sits inside the joined story (for CapCut / DaVinci project export)
+    t, parts = 0.0, []
+    for s in story:
+        d = _probe(Path(s))["dur"]
+        parts.append({"file": str(Path(s).resolve()), "start": round(t, 4), "dur": round(d, 4)})
+        t += d
+    (out.parent / "story_parts.json").write_text(json.dumps(parts, ensure_ascii=False, indent=1))
     return out

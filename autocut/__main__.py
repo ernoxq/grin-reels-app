@@ -52,6 +52,15 @@ def main() -> None:
     rl.add_argument("--quality", default="high", choices=["high", "prores"])
     rl.add_argument("--lang", help="speech language (ro, ru, en...); default: detect automatically")
 
+    ex = sub.add_parser("export", help="spec.json -> CapCut draft / FCPXML / SRT in the person's folders")
+    ex.add_argument("spec", type=Path)
+    ex.add_argument("--deliver", type=Path, required=True)
+    ex.add_argument("--name", required=True)
+    ex.add_argument("--video", type=Path)
+    ex.add_argument("--export", default="capcut,fcpxml,srt")
+    ex.add_argument("--capcut-root", type=Path)
+    ex.add_argument("--map", nargs="*", default=[])
+
     au = sub.add_parser("auto", help="ALL files from the chat -> one finished reel (joins every talking part)")
     au.add_argument("files", type=Path, nargs="+")
     au.add_argument("--talking", nargs="*", help="names of the clips where the person talks (default: detect)")
@@ -62,6 +71,11 @@ def main() -> None:
     au.add_argument("--model", default="cloud")
     au.add_argument("--out", type=Path)
     au.add_argument("--all-talking", action="store_true", help="every video is a part of the talk, join them all")
+    au.add_argument("--deliver", type=Path, help="folder for the results (the «Готовое» folder)")
+    au.add_argument("--name", help="name of the reel / project (default: Рилс <date time>)")
+    au.add_argument("--export", default="", help="comma list: capcut,fcpxml,srt (editable projects)")
+    au.add_argument("--capcut-root", type=Path, help="CapCut drafts folder …/com.lveditor.draft as seen here")
+    au.add_argument("--map", nargs="*", default=[], help="THIS_SHELL_PATH=REAL_COMPUTER_PATH for paths inside projects")
     au.add_argument("--no-inserts", action="store_true", help="talking parts only, no B-roll")
 
     rd = sub.add_parser("render", help="render a reel spec.json (after hand edits)")
@@ -138,6 +152,10 @@ def main() -> None:
             res.update(duration=s["duration"], cuts=len(s["voice"]), broll=len(s["broll"]),
                        captions=len(s["captions"]))
         print(json.dumps(res, ensure_ascii=False))
+    elif a.cmd == "export":
+        from .nle import export_all
+        print(json.dumps(export_all(a.spec, a.deliver, a.name, a.video, a.capcut_root, a.map,
+                                    tuple(k.strip() for k in a.export.split(","))), ensure_ascii=False))
     elif a.cmd == "auto":
         import time
         from .autoreel import run
@@ -160,7 +178,13 @@ def main() -> None:
                         script=str(a.script) if a.script else None, title=a.title, model=model, language=a.lang)
         video = render_reel(load_spec(spec_path), a.out / "final.mp4")
         s = json.loads(spec_path.read_text())
-        print(json.dumps({"video": str(Path(video).resolve()), "sec": round(s["duration"], 1), "parts": [Path(x).name for x in srt["story"]],
+        extra = {}
+        if a.deliver or a.export:
+            from .nle import export_all
+            name = a.name or time.strftime("Рилс %d.%m %H-%M")
+            kinds = tuple(k.strip() for k in a.export.split(",") if k.strip()) or ("srt",)
+            extra = export_all(spec_path, a.deliver or a.out, name, video, a.capcut_root, a.map, kinds)
+        print(json.dumps({**extra, "video": extra.get("video") or str(Path(video).resolve()), "sec": round(s["duration"], 1), "parts": [Path(x).name for x in srt["story"]],
                           "inserts": len(s["broll"]), "unused": len(srt["inserts"]) - len({b["src"] for b in s["broll"]}), "lang": s.get("lang"), "took_s": round(time.time() - t0)},
                          ensure_ascii=False))
     elif a.cmd == "render":

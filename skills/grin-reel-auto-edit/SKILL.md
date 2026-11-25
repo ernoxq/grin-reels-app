@@ -15,7 +15,26 @@ The engine makes every editing decision. Your job is to run ONE command and send
 - Before working, write one line: «Собираю рилс, это займёт несколько минут». After, at most 3 short lines.
 - Never re-run the whole build for a small change: edit the spec and `render` (see reference.md, F).
 
-## 1. Setup (once per chat)
+## 0. Folder mode: «Монтаж Claude» on the person's computer (check first)
+If the session has `mcp__remote-devices__*` tools, call `get_device_info`. If a connected folder contains `Исходники` (or the person names their editing folder), work there and do NOT ask them to attach files:
+- `Исходники/` - raw videos and photos (one reel at a time, or a subfolder per reel - take the one they name, else the newest files);
+- `Референсы/` - reels or pictures whose style to copy (use them only if the person asks for that style);
+- `Готовое/` - results go here. Create the three folders if the connected folder is empty.
+
+Run it on the computer with `device_bash` (it has 4 cores and sees the files; nothing is uploaded):
+```bash
+[ -d $HOME/grin ] || git clone -q --depth 1 https://github.com/ernoxq/grin-reels-app $HOME/grin
+F="$HOME/mnt/<folder>"; nohup bash $HOME/grin/run.sh "$F/Исходники/"* --deliver "$F/Готовое" --name "<short name>" \
+  --export capcut,fcpxml,srt [--capcut-root "$HOME/mnt/CapCut/User Data/Projects/com.lveditor.draft"] \
+  --map "$HOME/mnt/<folder>=<real path of that folder>" ["$HOME/mnt/CapCut=<real path of CapCut folder>"] > $HOME/out.txt 2>&1 &
+```
+Real paths come from `get_device_info.connectedFolders`. Then poll: `sleep 170; tail -1 $HOME/out.txt` (device_bash calls stop at 180 s; the job keeps running).
+- **CapCut project:** only if the person uses CapCut on this computer. Ask once to connect `~/Movies/CapCut` (device_request_folder_access) and pass `--capcut-root`; the reel then appears in CapCut after CapCut is restarted (Cmd+Q, open again). Without that folder the draft is left in `Готовое/<name> - проект/CapCut/`.
+- **DaVinci Resolve / Final Cut:** `<name> (DaVinci, Final Cut).fcpxml` in the project folder: File → Import → Timeline (DaVinci) or File → Import → XML (Final Cut).
+- Results: `Готовое/<name>.mp4`, `Готовое/<name> - проект/` (FCPXML, subtitles .srt, fonts and stickers). Say where they are in one line; do not send the video into the chat unless asked.
+- No `device_bash`, only file tools: stage the files from `Исходники`, run section 2 here, then write `final.mp4` back with `device_commit_files` (send it with SendUserFile first and commit by its file_uuid; big files can't be committed by path).
+
+## 1. Setup (once per chat, attached files)
 ```bash
 [ -d grin ] || cp -r <this skill's folder>/engine ./grin
 ```
