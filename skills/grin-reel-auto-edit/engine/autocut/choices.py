@@ -88,9 +88,12 @@ def apply_choices(style: dict, ch: dict) -> dict:
         s["aroll_look"].pop("input_luma", None)
         s["broll_look"] = {"bw": s["broll_look"].get("bw")}
     elif lut:
+        mix = float(ch.get("lut_strength", 0.6))  # presets at full strength look heavy on most footage
         s["aroll_look"]["lut"] = lut
+        s["aroll_look"]["lut_mix"] = mix
         s["aroll_look"].pop("input_luma", None)  # exposure target belongs to the original LUT
         s["broll_look"]["color"] = lut
+        s["broll_look"]["lut_mix"] = mix
     if (st := ch.get("cta")) is not None:
         if st == "none":
             s.pop("sticker", None)

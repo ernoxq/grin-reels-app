@@ -15,6 +15,15 @@ Save the person's limits: the script measures pace, colour and music; you look a
 
 **3-5 reels are better than one** when they are by the same creator: pass them all in one command; pace, colour and music become their common style, and the picture shows 8 frames across all of them. In the folder mode take every file in `Референсы/` (or the ones the person names). Don't mix different creators unless asked.
 
+## Step 0 - look at the whole reference first (always, once)
+`style-from-ref` measures only pace, colour and music; it does not see the FORMAT. So before anything else make one contact sheet of the whole reel and look at it:
+`ffmpeg -v error -i REF.mp4 -vf "fps=1,scale=180:-2,tile=10x6" sheet_all.png` (one picture, read it once).
+Decide which format it is and say it in one line:
+- **talking head + inserts/captions** (person in their real room, B-roll, text) → continue with Quick mode below;
+- **studio format** (person cut out of the background on a plain light set, cards/icons/headlines animate above them, the person shrinks when a card appears) → use the `grin-reel-studio` skill; take its colours (background, accent, caption colour) from the sheet into `theme`;
+- anything else (screen recording, slideshow, faceless) → tell the person honestly which parts GRIN can copy and which it cannot.
+Never deliver a first version in a different format than the reference: «похоже по темпу» is not «в таком же стиле».
+
 ## Quick mode - just someone else's finished reel (use this by default)
 The engine ships inside this skill under `engine/`.
 1. Copy it to the workspace with `cp -r <this skill's folder>/engine ./grin && cd grin`, then run `pip install --break-system-packages numpy Pillow fonttools faster-whisper "av<16" opencv-python-headless resvg-py`.

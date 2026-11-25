@@ -68,7 +68,7 @@ def _final_encoder(quality: str) -> list[str]:
     if IS_MAC:  # Apple Silicon hardware HEVC, ~45 Mbit/s like CapCut's "Higher"
         return ["-c:v", "hevc_videotoolbox", "-b:v", "18M", "-maxrate", "24M", "-tag:v", "hvc1", "-pix_fmt", "yuv420p"]
     # smooth playback in phone players / chat previews; still far above what Instagram keeps (~3-5 Mbit/s)
-    return ["-c:v", "libx264", "-preset", "medium", "-crf", "18", "-maxrate", "14M", "-bufsize", "28M",
+    return ["-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-maxrate", "14M", "-bufsize", "28M",
             "-profile:v", "high", "-level", "4.2", "-pix_fmt", "yuv420p"]
 
 
@@ -247,8 +247,18 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
     def add_input(path: str, ss: float, t: float) -> int:
         return add_raw("-ss", f"{ss:.4f}", "-t", f"{t:.4f}", "-i", path)
 
-    def lut(name: str | None) -> str:
-        return f",lut3d='{_esc(_p(spec, name))}':interp=tetrahedral" if name else ""
+    nlut = [0]
+
+    def lut(name: str | None, mix: float | None = None) -> str:
+        if not name:
+            return ""
+        f = f"lut3d='{_esc(_p(spec, name))}':interp=tetrahedral"
+        if mix is None or mix >= 0.99:
+            return "," + f
+        nlut[0] += 1
+        k = nlut[0]  # blend the graded picture over the original at `mix` strength
+        return (f",format=gbrp,split[lo{k}][lg{k}];[lg{k}]{f}[lc{k}];[lc{k}][lo{k}]"
+                f"blend=all_mode=normal:all_opacity={max(0.0, mix):.2f}")
 
     # A-roll: zoom + reframe + grade, segments concatenated (voice track drives timing)
     S, ax, ay = look.get("zoom", 1.0), look.get("x", 0.0), look.get("y", 0.0)
@@ -258,8 +268,9 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
     vlabels, alabels = [], []
     for k, seg in enumerate(spec["voice"]):
         i = add_input(_src(spec, seg["src"]), seg["in"], seg["dur"])
-        fc.append(f"[{i}:v]fps={FPS},scale={sw}:{sh}:flags=lanczos,crop={W}:{H}:{cx}:{cy},setsar=1"
-                  f"{_gain(look.get('gain'))}{wb_filter(look.get('wb_gain'))}{lut(look.get('lut'))}{adjust_filters(look.get('adjust'))}"
+        fc.append(f"[{i}:v]fps={FPS},scale={sw}:{sh}:force_original_aspect_ratio=increase:flags=lanczos,"
+                  f"crop={sw}:{sh},crop={W}:{H}:{cx}:{cy},setsar=1"
+                  f"{_gain(look.get('gain'))}{wb_filter(look.get('wb_gain'))}{lut(look.get('lut'), look.get('lut_mix'))}{adjust_filters(look.get('adjust'))}"
                   f",format=yuv420p,setpts=PTS-STARTPTS[av{k}]")
         fc.append(f"[{i}:a]aresample=48000,asetpts=PTS-STARTPTS[aa{k}]")
         vlabels.append(f"[av{k}]")
@@ -273,7 +284,7 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
         sp = b.get("speed", 1.0)
         if b.get("image"):  # photo: gentle push-in (Ken Burns), same grade as video B-roll
             i = add_raw("-loop", "1", "-framerate", str(FPS), "-t", f"{b['dur'] + 0.1:.3f}", "-i", _src(spec, b["src"]))
-            grade = _gain(b.get("gain")) + (lut(bl.get("bw")) + ",hue=s=0" if b.get("look") == "bw" else lut(bl.get("color"))) + adjust_filters(bl.get("adjust") or look.get("adjust"))
+            grade = _gain(b.get("gain")) + (lut(bl.get("bw")) + ",hue=s=0" if b.get("look") == "bw" else lut(bl.get("color"), bl.get("lut_mix"))) + adjust_filters(bl.get("adjust") or look.get("adjust"))
             frames = int(b["dur"] * FPS) + 3
             fc.append(f"[{i}:v]scale={W * 2}:{H * 2}:force_original_aspect_ratio=increase,crop={W * 2}:{H * 2},"
                       f"zoompan=z='1+0.06*on/{frames}':x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)':d=1:s={W}x{H}:fps={FPS},"
@@ -283,7 +294,7 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
             last = f"v{k}"
             continue
         i = add_input(_src(spec, b["src"]), b["in"], b["dur"] * sp + 0.1)
-        grade = _gain(b.get("gain")) + (lut(bl.get("bw")) + ",hue=s=0" if b.get("look") == "bw" else lut(bl.get("color"))) + adjust_filters(bl.get("adjust") or look.get("adjust"))
+        grade = _gain(b.get("gain")) + (lut(bl.get("bw")) + ",hue=s=0" if b.get("look") == "bw" else lut(bl.get("color"), bl.get("lut_mix"))) + adjust_filters(bl.get("adjust") or look.get("adjust"))
         fc.append(f"[{i}:v]setpts=(PTS-STARTPTS)/{sp},fps={FPS},scale={W}:{H}:force_original_aspect_ratio=increase,"
                   f"crop={W}:{H},setsar=1{grade},format=yuv420p,trim=0:{b['dur']:.4f},"
                   f"setpts=PTS+{b['start']:.4f}/TB[b{k}]")

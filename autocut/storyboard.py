@@ -120,7 +120,14 @@ def fix_words(words: list[dict], fixes: list[str]) -> list[dict]:
                 last = words[i + n - 1]["text"]
                 tail = last[len(last.rstrip(".,!?:;…")):]
                 b2 = b[:1].upper() + b[1:] if words[i]["text"][:1].isupper() else b
-                out.append(dict(words[i], text=b2 + tail, end=words[i + n - 1]["end"]))
+                parts = (b2 + tail).split()
+                t0, t1 = words[i]["start"], words[i + n - 1]["end"]
+                tot = sum(len(x) for x in parts) or 1
+                acc = t0
+                for x in parts:
+                    d = (t1 - t0) * len(x) / tot
+                    out.append(dict(words[i], text=x, start=round(acc, 3), end=round(acc + d, 3)))
+                    acc += d
                 i += n; done = True
                 break
         if not done:
