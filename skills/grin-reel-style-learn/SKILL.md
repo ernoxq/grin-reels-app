@@ -1,6 +1,6 @@
 ---
 name: grin-reel-style-learn
-description: Learn the editing style of any reel the person likes, from just that finished video ("сделай в таком стиле", "разбери этот ролик"), or very precisely from the reel plus its source clips, and save it as a reusable GRIN Reels style - including the studio format (speaker cut out on a light set with animated cards) and motion graphics. Then the person's own videos are edited in that style.
+description: Learn the editing style of any reel the person likes, from just that finished video ("сделай в таком стиле", "разбери этот ролик"), or very precisely from the reel plus its source clips, and save it as a reusable GRIN Reels style - including the studio format (speaker cut out on a light set with animated cards) and motion graphics. Then the person's own videos are edited in that style. Use for «сделай в таком стиле», «как этот ролик», «разбери референс», «повтори этот монтаж».
 ---
 
 <!-- GRIN Reels skill — © 2026 Ernest Grin (GRIN studio). All rights reserved. Licensed to the buyer for personal use; redistribution or resale prohibited. See LICENSE.md in the GRIN Reels folder. -->
@@ -14,6 +14,31 @@ Save the person's limits: the script measures pace, colour and music; you look a
 **Colour is NOT copied by default** (another light easily turns skin green or grey). Add `--colour` only when the person asks for the colour/look of the reference; it is applied at 40 %. Then check one frame of the result: skin must look like skin.
 
 **3-5 reels are better than one** when they are by the same creator: pass them all in one command; pace, colour and music become their common style, and the picture shows 8 frames across all of them. In the folder mode take every file in `Референсы/` (or the ones the person names). Don't mix different creators unless asked.
+
+## Understanding the request (read first, every time)
+Do exactly what was asked, change nothing else, and keep earlier decisions. Before a build or re-render that takes minutes, say in one line what you understood: «Понял: убираю фразу про X, субтитры делаю жёлтыми, остальное как было». If a wish can mean two different results, ask ONE short question with 2–3 concrete options instead of guessing; never guess texts that will appear on screen.
+
+| The person says | Do |
+|---|---|
+| «собери / смонтируй рилс», «сделай видео из этого» | auto-edit, storyboard first (section 2) |
+| «сразу», «без плана», «не спрашивай» | skip `--plan`, build in one go |
+| «в таком стиле», «как этот ролик», + a reel | style-learn: Step 0 (look at the whole reference), then the matching mode |
+| «студийный стиль», «вырежи меня», «на светлом фоне с карточками» | Studio mode |
+| «добавь анимацию / надпись на словах …» | `place --motion` on those words (texts approved first) |
+| «поставь фото / видео / иконку, когда говорю …» | `place` on those words |
+| «убери фразу / кусок про …» / «верни …» | `--drop "…"` / `--keep "…"` |
+| «в субтитрах ошибка: … → …» | `--fix "wrong=right"` (several words are fine) |
+| «другой заголовок: …» | `--title "…"` (studio: the `title` card) |
+| «сделай короче, до N секунд» | drop the weakest sentences until it fits, show the plan |
+| «субтитры выше / ниже / крупнее / жёлтые / другим шрифтом» | caption style (studio: `theme.caption_y`, `theme.caption`); keep inside the safe band 270–1495 and say so if asked lower |
+| «закрывает лицо», «текст на лице» | `--pos auto` (default) or move the card up; studio: cards stay above the head |
+| «теплее / светлее / сочнее» | one slider, ±0.2 (Colour section) |
+| «музыку тише / другую / без музыки» | music in the style (reference.md, D) |
+| «вставь моё фото в карточку» | studio `name` card `photo` (the file they sent) |
+| «натуральнее», «не надо всё в белое», «руки обрезаны» | studio: no white fade; ask for the wide take (`--video`) |
+| «хочу редактировать в CapCut» | folder mode `--export capcut` / studio `--capcut` |
+| «покажи, что будет» | `--plan` (and `studio --plan`), no render |
+| something you cannot do | say so in one line and offer the nearest thing you can do |
 
 ## Step 0 - look at the whole reference first (always, once)
 `style-from-ref` measures only pace, colour and music; it does not see the FORMAT. So before anything else make one contact sheet of the whole reel and look at it:

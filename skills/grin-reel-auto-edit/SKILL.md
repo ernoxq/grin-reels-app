@@ -1,6 +1,6 @@
 ---
 name: grin-reel-auto-edit
-description: Make a finished vertical reel (Instagram/TikTok/Shorts) from whatever videos and photos the person drops into the chat — joins all talking parts, cuts pauses and bad takes, adds subtitles in the spoken language, title, colour, inserts, motion graphics, or a studio look (speaker cut out on a light set with animated cards) — with the GRIN Reels engine bundled in this skill. Use for «собери рилс», «смонтируй видео», «сделай рилс из этого».
+description: Make a finished vertical reel (Instagram/TikTok/Shorts) from whatever videos and photos the person drops into the chat — joins all talking parts, cuts pauses and bad takes, adds subtitles in the spoken language, title, colour, inserts, motion graphics, or a studio look (speaker cut out on a light set with animated cards) — with the GRIN Reels engine bundled in this skill. Use for «собери рилс», «смонтируй видео», «сделай рилс из этого», «вырежи меня на фон с карточками», «добавь анимацию / надпись», «поставь фото на слова», and any change to a reel made with GRIN.
 ---
 
 <!-- GRIN Reels skill — © 2026 Ernest Grin (GRIN studio). All rights reserved. Licensed to the buyer for personal use; redistribution or resale prohibited. -->
@@ -14,6 +14,31 @@ The engine makes every editing decision. Your job is to run ONE command and send
 - Do not look at the video or make contact sheets. Do not explain the steps.
 - Before working, write one line: «Собираю рилс, это займёт несколько минут». After, at most 3 short lines.
 - Never re-run the whole build for a small change: edit the spec and `render` (see reference.md, F).
+
+## Understanding the request (read first, every time)
+Do exactly what was asked, change nothing else, and keep earlier decisions. Before a build or re-render that takes minutes, say in one line what you understood: «Понял: убираю фразу про X, субтитры делаю жёлтыми, остальное как было». If a wish can mean two different results, ask ONE short question with 2–3 concrete options instead of guessing; never guess texts that will appear on screen.
+
+| The person says | Do |
+|---|---|
+| «собери / смонтируй рилс», «сделай видео из этого» | auto-edit, storyboard first (section 2) |
+| «сразу», «без плана», «не спрашивай» | skip `--plan`, build in one go |
+| «в таком стиле», «как этот ролик», + a reel | style-learn: Step 0 (look at the whole reference), then the matching mode |
+| «студийный стиль», «вырежи меня», «на светлом фоне с карточками» | Studio mode |
+| «добавь анимацию / надпись на словах …» | `place --motion` on those words (texts approved first) |
+| «поставь фото / видео / иконку, когда говорю …» | `place` on those words |
+| «убери фразу / кусок про …» / «верни …» | `--drop "…"` / `--keep "…"` |
+| «в субтитрах ошибка: … → …» | `--fix "wrong=right"` (several words are fine) |
+| «другой заголовок: …» | `--title "…"` (studio: the `title` card) |
+| «сделай короче, до N секунд» | drop the weakest sentences until it fits, show the plan |
+| «субтитры выше / ниже / крупнее / жёлтые / другим шрифтом» | caption style (studio: `theme.caption_y`, `theme.caption`); keep inside the safe band 270–1495 and say so if asked lower |
+| «закрывает лицо», «текст на лице» | `--pos auto` (default) or move the card up; studio: cards stay above the head |
+| «теплее / светлее / сочнее» | one slider, ±0.2 (Colour section) |
+| «музыку тише / другую / без музыки» | music in the style (reference.md, D) |
+| «вставь моё фото в карточку» | studio `name` card `photo` (the file they sent) |
+| «натуральнее», «не надо всё в белое», «руки обрезаны» | studio: no white fade; ask for the wide take (`--video`) |
+| «хочу редактировать в CapCut» | folder mode `--export capcut` / studio `--capcut` |
+| «покажи, что будет» | `--plan` (and `studio --plan`), no render |
+| something you cannot do | say so in one line and offer the nearest thing you can do |
 
 ## 0. Folder mode: «Монтаж Claude» on the person's computer (check first)
 If the session has `mcp__remote-devices__*` tools, call `get_device_info`. If a connected folder contains `Исходники` (or the person names their editing folder), work there and do NOT ask them to attach files:
