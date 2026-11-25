@@ -9,4 +9,4 @@ LOG="$PWD/grin.log"
     { pip install -q --break-system-packages numpy Pillow fonttools faster-whisper "av<16" opencv-python-headless || pip3 install -q numpy Pillow fonttools faster-whisper "av<16" opencv-python-headless; }
   command -v ffmpeg >/dev/null || (apt-get install -y -qq ffmpeg)
 } >>"$LOG" 2>&1
-python3 -m autocut auto "$@" 2>>"$LOG" | tail -1
+python3 -m autocut auto "$@" 2>>"$LOG"
