@@ -74,14 +74,17 @@ def learn(ref: Path, name: str, base: str = "warm_intro") -> dict:
         fp = out / f"ref_look_{i + 1}.png"
         _frame(ref, (a + b) / 2, 720).save(fp)
         refs.append(str(fp.relative_to(ROOT / "library")))
-    # contact sheet every 0.5 s for Claude to judge text, title, sticker, framing
-    ts = np.arange(0.25, dur, 0.5)[:40]
-    tiles = [_frame(ref, t, 216) for t in ts]
-    cols, th = 8, tiles[0].height
-    sheet = Image.new("RGB", (216 * cols, (th + 18) * ((len(tiles) + cols - 1) // cols)), "white")
+    # 8 key frames only (Claude looks at them once, images are the costly part):
+    # the opening (title), 6 different shots, the end (button / sticker). Pace, colour, music are measured above.
+    mids = sorted({round((a + b) / 2, 2) for a, b, _ in sorted(frames, key=lambda f: -(f[1] - f[0]))[:6]})
+    ts = [min(0.4, dur / 2)] + mids + [max(0.0, dur - 0.5)]
+    tw = 200
+    tiles = [_frame(ref, t, tw) for t in ts]
+    cols, th = 4, tiles[0].height
+    sheet = Image.new("RGB", (tw * cols, (th + 18) * ((len(tiles) + cols - 1) // cols)), "white")
     d = ImageDraw.Draw(sheet)
     for i, (t, im) in enumerate(zip(ts, tiles)):
-        x, y = (i % cols) * 216, (i // cols) * (th + 18)
+        x, y = (i % cols) * tw, (i // cols) * (th + 18)
         sheet.paste(im, (x, y + 18))
         d.text((x + 4, y + 3), f"{t:.1f}s", fill="black")
     sheet.save(out / "sheet.png")
