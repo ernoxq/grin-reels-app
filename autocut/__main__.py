@@ -16,6 +16,21 @@ from pathlib import Path
 ROOT = app_root()
 
 
+def fetch_model_path(m: str | None):
+    if m in (None, "cloud"):
+        from .fetch_model import fetch
+        return fetch()
+    return m
+
+
+def _split(spec_path: Path, parts: list[dict]) -> None:
+    from .prep import split_voice
+    sp = json.loads(spec_path.read_text())
+    if (spec_path.parent / "lang.txt").exists():
+        sp["lang"] = (spec_path.parent / "lang.txt").read_text().strip()
+    spec_path.write_text(json.dumps(split_voice(sp, parts), ensure_ascii=False, indent=1))
+
+
 def _finish(job: Path, t0: float) -> dict:
     import time
     from .reel import load_spec, render_reel
@@ -204,9 +219,14 @@ def main() -> None:
         a.out.mkdir(parents=True, exist_ok=True)
         sp_f = a.out / "story_parts.json"
         if sp_f.exists() and [x["file"] for x in json.loads(sp_f.read_text())] != [str(Path(x).resolve()) for x in srt["story"]]:
-            for f in ("story.mp4", "story_parts.json", "words.json", "words_edit.json", "auto_args.json", "lang.txt"):
+            for f in ("story.wav", "story_parts.json", "words.json", "words_edit.json", "auto_args.json", "lang.txt"):
                 (a.out / f).unlink(missing_ok=True)  # other files than last time: start this job fresh
-        main = join(srt["story"], a.out / "story.mp4")
+        from .prep import join_audio, split_voice
+        audio, parts = join_audio(srt["story"], a.out / "story.wav")  # sound only: seconds, not minutes
+        if not (a.out / "words.json").exists():
+            from .transcribe import transcribe
+            transcribe(str(audio), a.out / "words.json", str(fetch_model_path(a.model)), a.lang)
+        main = srt["story"][0]  # first clip = picture reference (size, colour); speech comes from words.json
         model = a.model
         if model == "cloud":
             from .fetch_model import fetch
@@ -218,7 +238,8 @@ def main() -> None:
                     deliver=str(a.deliver) if a.deliver else None, name=a.name, export=a.export,
                     capcut_root=str(a.capcut_root) if a.capcut_root else None, map=a.map, parts=srt["story"])
         spec_path = run(str(main), args["inserts"], args["style"], str(a.out), script=args["script"],
-                        title=a.title, model=model, language=a.lang)
+                        title=a.title, words_json=str(a.out / "words.json"), language=a.lang)
+        _split(spec_path, parts)
         prev = json.loads((a.out / "auto_args.json").read_text()) if (a.out / "auto_args.json").exists() else {}
         drops = [d for d in prev.get("drop", []) if d not in a.keep] + [d for d in a.drop if d not in prev.get("drop", [])]
         args["drop"] = drops
@@ -229,6 +250,7 @@ def main() -> None:
             (a.out / "words_edit.json").write_text(json.dumps(drop_phrases(w, a.drop), ensure_ascii=False))
             spec_path = run(str(main), args["inserts"], args["style"], str(a.out), script=args["script"],
                             title=a.title, words_json=str(a.out / "words_edit.json"), language=a.lang)
+            _split(spec_path, parts)
         (a.out / "auto_args.json").write_text(json.dumps(args, ensure_ascii=False))
         if a.plan:
             from .storyboard import plan_text

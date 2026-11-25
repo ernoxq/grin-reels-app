@@ -45,9 +45,12 @@ def plan_text(job: Path) -> str:
     words = json.loads((job / "words.json").read_text())
     if (job / "words_edit.json").exists():
         words = json.loads((job / "words_edit.json").read_text())
+    parts = json.loads((job / "story_parts.json").read_text()) if (job / "story_parts.json").exists() else []
+    off = {f"A{i + 1}": p["start"] for i, p in enumerate(parts)}
     segs, t = [], 0.0
-    for v in spec["voice"]:
-        segs.append((v["in"], v["in"] + v["dur"], t)); t += v["dur"]
+    for v in spec["voice"]:  # back to the common timeline of the recognised words
+        a = v["in"] + off.get(v["src"], 0.0)
+        segs.append((a, a + v["dur"], t)); t += v["dur"]
 
     def out_time(w: dict):
         mid = (w["start"] + w["end"]) / 2
@@ -80,7 +83,7 @@ def plan_text(job: Path) -> str:
         lines.append("Вырезано (повторы, оговорки):")
         lines += [f"- {c[:90]}" for c in cut]
     used = {b["src"] for b in ins}
-    unused = [Path(p).name for k, p in spec["sources"].items() if k != "A" and k not in used]
+    unused = [Path(p).name for k, p in spec["sources"].items() if not k.startswith("A") and k not in used]
     if unused:
         lines.append("Не вошли: " + ", ".join(unused))
     if spec.get("sticker", {}).get("asset"):

@@ -120,3 +120,53 @@ def join(story: list[str], out: Path, width: int = 1080, height: int = 1920, fps
         t += d
     (out.parent / "story_parts.json").write_text(json.dumps(parts, ensure_ascii=False, indent=1))
     return out
+
+
+def join_audio(story: list[str], out: Path) -> tuple[Path, list[dict]]:
+    """Glue only the SOUND of all talking parts (seconds, no video decoding) for speech recognition.
+    Returns the audio file and where each part starts on that common timeline."""
+    out.parent.mkdir(parents=True, exist_ok=True)
+    parts, t = [], 0.0
+    for s in story:
+        r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "a:0", "-show_entries", "stream=duration",
+                            "-of", "csv=p=0", s], capture_output=True, text=True)
+        try:
+            d = float(r.stdout.strip().splitlines()[0])
+        except (ValueError, IndexError):
+            d = _probe(Path(s))["dur"]
+        parts.append({"file": str(Path(s).resolve()), "start": round(t, 4), "dur": round(d, 4)})
+        t += d
+    if not out.exists():
+        inp, cat = [], ""
+        for i, s in enumerate(story):
+            inp += ["-i", s]
+            cat += f"[{i}:a]aresample=48000,aformat=channel_layouts=stereo[a{i}];"
+        fc = cat + "".join(f"[a{i}]" for i in range(len(story))) + f"concat=n={len(story)}:v=0:a=1[a]"
+        subprocess.run(["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", *inp, "-filter_complex", fc,
+                        "-map", "[a]", "-c:a", "pcm_s16le", str(out)], check=True)
+    (out.parent / "story_parts.json").write_text(json.dumps(parts, ensure_ascii=False, indent=1))
+    return out, parts
+
+
+def split_voice(spec: dict, parts: list[dict]) -> dict:
+    """Voice segments on the common timeline -> segments of the original clips (render decodes only those)."""
+    keys = {}
+    for i, p in enumerate(parts):
+        keys[p["file"]] = f"A{i + 1}"
+        spec["sources"][f"A{i + 1}"] = p["file"]
+    out = []
+    for seg in spec["voice"]:
+        a, left = seg["in"], seg["dur"]
+        while left > 0.01:
+            p = next((x for x in parts if x["start"] <= a + 1e-6 < x["start"] + x["dur"] - 0.02), None)
+            if p is None:
+                nxt = [x for x in parts if x["start"] > a]
+                if not nxt:
+                    break
+                left -= nxt[0]["start"] - a; a = nxt[0]["start"]
+                continue
+            take = min(left, p["start"] + p["dur"] - a)
+            out.append({"src": keys[p["file"]], "in": round(a - p["start"], 4), "dur": round(take, 4)})
+            a += take; left -= take
+    spec["voice"] = out
+    return spec

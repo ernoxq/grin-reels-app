@@ -46,7 +46,11 @@ def build_timeline(spec_path: Path) -> dict:
     parts = json.loads(parts_f.read_text()) if parts_f.exists() else [
         {"file": spec["sources"]["A"], "start": 0.0, "dur": 1e9}]
     main, t = [], 0.0
-    for seg in spec["voice"]:  # map story time -> original clip, split across clip borders
+    if any(v["src"] != "A" for v in spec["voice"]):  # voice already points at the original clips
+        for v in spec["voice"]:
+            main.append({"file": spec["sources"][v["src"]], "in": v["in"], "dur": v["dur"], "start": t})
+            t += v["dur"]
+    for seg in ([] if main else spec["voice"]):  # map story time -> original clip, split across clip borders
         a, left = seg["in"], seg["dur"]
         while left > 0.01:
             p = next((x for x in parts if x["start"] <= a + 1e-6 < x["start"] + x["dur"] - 0.02), None)
