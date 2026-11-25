@@ -110,9 +110,16 @@ def select_takes(phrases: list[Phrase], script: list[str] | None = None, thr: fl
     for i, p in enumerate(phrases):
         head = p.norm[: max(12, int(len(p.norm) * 0.6))]
         nxt = phrases[i + 1:i + 6]
-        restart = [q for q in nxt if _sim(head, q.norm[: len(head)]) > 0.75]
+        first = p.norm.split()[:1]
+        # a restart begins with the same word and sounds the same (not just a repeated quote inside)
+        restart = [q for q in nxt if q.norm.split()[:1] == first and _sim(head, q.norm[: len(head)]) > 0.75]
         cp = content(p)
-        retold = [q for q in nxt if len(cp) >= 3 and len(cp & content(q)) >= 0.5 * len(cp)]
+        n_p = max(1, len(p.words))
+        # retold: a later take of similar length says the same; a short hook before a long sentence stays
+        retold = [q for q in nxt[:3] if len(cp) >= 4 and len(cp & content(q)) >= 0.6 * len(cp)
+                  and len(cp & content(q)) >= 0.4 * len(content(q)) and 0.6 <= len(q.words) / n_p <= 1.6]
+        if i == 0 and p.words and p.words[-1].text.strip().endswith("?"):
+            retold = []  # opening question = the hook, keep it
         echo = len(p.words) <= 3 and cp | {w for w in p.norm.split()} and all(
             w in " ".join(q.norm for q in nxt[:2]) for w in p.norm.split())  # "ловить." then "...ловить яркие эмоции"
         if restart or retold or junk(p) or echo:

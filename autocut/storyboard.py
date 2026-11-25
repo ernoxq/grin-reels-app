@@ -102,21 +102,27 @@ def plan_text(job: Path) -> str:
 
 
 def fix_words(words: list[dict], fixes: list[str]) -> list[dict]:
-    """--fix "вадим=свадебный" "anuarii=ianuarie": exact word replacements (case kept for the first letter)."""
+    """--fix "wrong=right": one or several words ("получаешь от=не получаешь от", "Бавла Стадия=Bible Study").
+    Timing is kept: the right text takes the time of the wrong words."""
     pairs = []
     for f in fixes:
         if "=" in f:
             a, b = f.split("=", 1)
-            pairs.append((_norm(a), b.strip()))
-    out = []
-    for w in words:
-        t = w["text"]
-        core = _norm(t)
-        for a, b in pairs:
-            if core == a:
-                tail = t[len(t.rstrip(".,!?:;…")):]
-                b2 = b[:1].upper() + b[1:] if t[:1].isupper() else b
-                t = b2 + tail
+            toks = [_norm(t) for t in a.split() if _norm(t)]
+            if toks:
+                pairs.append((toks, b.strip()))
+    out, i = [], 0
+    while i < len(words):
+        done = False
+        for toks, b in pairs:
+            n = len(toks)
+            if [_norm(w["text"]) for w in words[i:i + n]] == toks:
+                last = words[i + n - 1]["text"]
+                tail = last[len(last.rstrip(".,!?:;…")):]
+                b2 = b[:1].upper() + b[1:] if words[i]["text"][:1].isupper() else b
+                out.append(dict(words[i], text=b2 + tail, end=words[i + n - 1]["end"]))
+                i += n; done = True
                 break
-        out.append(dict(w, text=t))
+        if not done:
+            out.append(words[i]); i += 1
     return out
