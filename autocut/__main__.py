@@ -149,6 +149,13 @@ def main() -> None:
     ic.add_argument("--color", default="#1E1E1D"); ic.add_argument("--bg"); ic.add_argument("--shape", default="circle")
     ic.add_argument("--label"); ic.add_argument("--stroke", type=float, default=1.75)
     sub.add_parser("icons", help="contact sheet of all GRIN icons -> library/icons/_sheet.png")
+    so = sub.add_parser("studio", help="GRIN Studio: speaker cut out on a light set + motion cards (scenes.json)")
+    so.add_argument("job"); so.add_argument("--scenes", required=True)
+    so.add_argument("--video", help="wider/uncropped take of the same recording (better cut-out)")
+    so.add_argument("--out"); so.add_argument("--plan", action="store_true", help="only list the scenes with their times")
+    so.add_argument("--capcut", help="also write a layered CapCut project with this name")
+    so.add_argument("--capcut-root"); so.add_argument("--media-dir"); so.add_argument("--map", nargs="*", default=[])
+    sub.add_parser("studio-help", help="scene types for scenes.json")
     pl = sub.add_parser("place", help="put a photo/video/icon on top at the given words, then re-render")
     pl.add_argument("spec"); pl.add_argument("file", nargs="?")
     pl.add_argument("--words"); pl.add_argument("--at", type=float); pl.add_argument("--dur", type=float)
@@ -300,6 +307,19 @@ def main() -> None:
     elif a.cmd == "icons":
         from .icons import export_svgs, sheet
         export_svgs(); print(sheet(ROOT / "library/icons/_sheet.png"))
+    elif a.cmd == "studio-help":
+        from .studio import SCENES
+        print(SCENES)
+    elif a.cmd == "studio":
+        from .studio import capcut, render
+        job = Path(a.job)
+        r = render(job, Path(a.scenes), Path(a.video) if a.video else None, Path(a.out) if a.out else None, plan=a.plan)
+        if a.capcut and not a.plan:
+            from .export_capcut import default_draft_root
+            root = Path(a.capcut_root) if a.capcut_root else default_draft_root()
+            r.update(capcut(job, Path(a.scenes), a.capcut, root, Path(a.media_dir) if a.media_dir else job / "studio" / "capcut_media",
+                            Path(a.video) if a.video else None, a.map))
+        print(r["plan"] if a.plan else json.dumps(r, ensure_ascii=False))
     elif a.cmd == "place":
         from .place import place
         if a.motion:
@@ -311,7 +331,7 @@ def main() -> None:
             n = len(spec.get("overlays", []) or [])
             clip = motion_render(a.motion, a.text or a.words or "", Path(a.spec).parent / "motion" / f"m{n}_{a.motion}.mov",
                                  d, a.accent, sub=a.sub, label=a.label, n=a.n, font=a.font)
-            print(json.dumps(place(a.spec, str(clip), a.words, a.at, "window", d, a.pos or "center", 1.0, None,
+            print(json.dumps(place(a.spec, str(clip), a.words, a.at, "window", d, a.pos or "auto", 1.0, None,
                                    anim="none"), ensure_ascii=False))
         else:
             print(json.dumps(place(a.spec, a.file, a.words, a.at, a.how, a.dur, a.pos, a.width, a.icon, a.color,

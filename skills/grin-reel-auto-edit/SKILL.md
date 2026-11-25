@@ -60,7 +60,8 @@ Options (add only if the person said so):
 The engine itself joins every talking clip in file-name order, removes repeats, pauses and mistakes, spreads the other files evenly as inserts (never on the title or the end), detects the language.
 
 **Motion graphics (animated text in GRIN style)** - offer when a number, a name, a step or a key phrase deserves it:
-`python -m autocut place grin/jobs/r1/spec.json --motion KIND --text "..." --words "слова из речи" [--pos top|center|bottom] [--accent "#E4F23C"]`
+`python -m autocut place grin/jobs/r1/spec.json --motion KIND --text "..." --words "слова из речи" [--pos auto|top|center|bottom] [--accent "#E4F23C"]`
+By default (`auto`) the engine finds the face and puts the graphic above the head if there is room, else on the chest above the captions — never on the face. Before rendering, show the person the list of motion texts with their words («что напишу и где») and let them correct it: you invent these texts, so they must approve them.
 - `headline` - big words pop in, `*phrase in stars*` gets a marker: «Монтаж за *15 минут*»;
 - `plate` - name plate, `--sub` small line above: «Кристина» / «свадебный рилсмейкер»;
 - `number` - counts up: «30 000 лей», `--label` under it;
@@ -69,6 +70,10 @@ The engine itself joins every talking clip in file-name order, removes repeats, 
 Each is a separate clip in the CapCut / DaVinci project, so it stays editable. Do not look at the result yourself.
 
 **Reference by link:** `python -m autocut fetch URL --out <Референсы or refs>`. If it answers `network` or `login`, tell the person: «Не могу скачать по ссылке - сохрани рилс и положи файл в папку Референсы (или пришли сюда)».
+
+**Studio format** (speaker cut out of the room on a light set + cards, like many "expert" reels): use the `grin-reel-studio` skill on the same job. Tip for the person: film with room on both sides and down to the table; a tight vertical crop leaves straight edges on the cut-out.
+
+**Safe zones:** captions, titles and graphics stay inside the Reels/TikTok/Shorts safe band (y 270–1495 of 1920). Never move them lower than that on request without warning that the app's caption and buttons will cover them.
 
 ## Colour: natural by default (strict)
 - The default style `natural` keeps real colours: a gentle white-balance nudge (only if there is something white/grey in the shot), +8 % contrast, +6 % saturation. Do not add a LUT, filter or "cinematic look" unless the person asks.

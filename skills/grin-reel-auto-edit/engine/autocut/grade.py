@@ -105,10 +105,12 @@ def auto_white_point(video: str, ss: float = 0.0, dur: float | None = None, stre
     sat = (mx - mn) / np.maximum(mx, 1)
     lum = a.mean(1)
     sel = a[(sat < 0.25) & (lum > np.percentile(lum, 85)) & (mx < 250)]
-    ref = sel.mean(0) if len(sel) > 200 else a.mean(0)
+    if len(sel) < 200:  # no clear white/grey object: leave the colour alone (grey-world ruins coloured scenes)
+        return [1.0, 1.0, 1.0]
+    ref = sel.mean(0)
     gains = ref[1] / np.maximum(ref, 1)
     gains = 1 + (gains - 1) * strength
-    return [round(float(np.clip(g, 0.8, 1.25)), 4) for g in gains]
+    return [round(float(np.clip(g, 0.93, 1.07)), 4) for g in gains]  # a nudge, never a repaint
 
 
 def adjust_filters(adj: dict | None) -> str:

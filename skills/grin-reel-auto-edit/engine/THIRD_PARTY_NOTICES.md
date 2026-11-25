@@ -33,3 +33,11 @@ Roboto Condensed, Source Sans 3 — from github.com/google/fonts. Variable fonts
 ## resvg-py — renders GRIN icons to PNG (MIT / Apache-2.0)
 
 ## GRIN icon set and colour presets — © 2026 Ernest Grin, part of GRIN Reels (see LICENSE.md)
+
+## Robust Video Matting (mobilenetv3) — speaker cut-out in `studio` (downloaded on first use, NOT bundled)
+GPL-3.0, Copyright (c) 2021 Shanchuan Lin (PeterL1n/RobustVideoMatting). Saved to library/models/rvm_mobilenetv3_fp32.onnx.
+Before distributing GRIN Reels together with this model, replace it with a permissively licensed matting model
+(`MATTE_URL` in autocut/studio.py) or comply with the GPL.
+
+## Marck Script — library/fonts/marckscript/ (SIL Open Font License 1.1, text in OFL.txt)
+Handwritten line of the studio titles. Copyright (c) 2011 Denis Masharov & Marck Fogel.

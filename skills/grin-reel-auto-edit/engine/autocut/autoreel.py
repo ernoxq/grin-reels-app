@@ -93,12 +93,36 @@ def select_takes(phrases: list[Phrase], script: list[str] | None = None, thr: fl
             if best:
                 keep.append(respell(best[1], line))
         return keep
-    # no script: a phrase is a failed take if a later phrase starts the same way
+    # no script: drop failed takes, false starts and mumbled fragments; the LAST good take wins
+    def content(p: Phrase) -> set[str]:
+        return {w for w in p.norm.split() if len(w) >= 4}
+
+    def junk(p: Phrase) -> bool:
+        n = len(p.words)
+        prob = sum(w.prob for w in p.words) / max(1, n)
+        last = p.words[-1].text.strip() if p.words else ""
+        trails = last.endswith(("...", "…", "-", "—"))
+        return (prob < 0.45
+                or (n <= 3 and (prob < 0.7 or last.endswith("?") or trails))
+                or (trails and n <= 7))
+
     keep = []
     for i, p in enumerate(phrases):
         head = p.norm[: max(12, int(len(p.norm) * 0.6))]
-        later = [q for q in phrases[i + 1:i + 6] if _sim(head, q.norm[: len(head)]) > 0.75]
-        if later or len(p.words) < 2 and p.words[0].prob < 0.5:
+        nxt = phrases[i + 1:i + 6]
+        first = p.norm.split()[:1]
+        # a restart begins with the same word and sounds the same (not just a repeated quote inside)
+        restart = [q for q in nxt if q.norm.split()[:1] == first and _sim(head, q.norm[: len(head)]) > 0.75]
+        cp = content(p)
+        n_p = max(1, len(p.words))
+        # retold: a later take of similar length says the same; a short hook before a long sentence stays
+        retold = [q for q in nxt[:3] if len(cp) >= 4 and len(cp & content(q)) >= 0.6 * len(cp)
+                  and len(cp & content(q)) >= 0.4 * len(content(q)) and 0.6 <= len(q.words) / n_p <= 1.6]
+        if i == 0 and p.words and p.words[-1].text.strip().endswith("?"):
+            retold = []  # opening question = the hook, keep it
+        echo = len(p.words) <= 3 and cp | {w for w in p.norm.split()} and all(
+            w in " ".join(q.norm for q in nxt[:2]) for w in p.norm.split())  # "ловить." then "...ловить яркие эмоции"
+        if restart or retold or junk(p) or echo:
             continue
         keep.append(p)
     return keep
@@ -222,27 +246,35 @@ def _wrap(text: str, max_line: int) -> str:
 
 # ------------------------------------------------------------------ B-roll
 def plan_broll(sentences: list[tuple[float, float]], clips: list[dict], style: dict, total: float) -> list[dict]:
+    """Inserts go on every other sentence, never on the first (title) or the last (end button) one.
+    With fewer clips than slots they are spread evenly over the whole video, not bunched at the start."""
     r = style["broll_rules"]
-    lo, hi = r.get("window", [0.08, 0.68])
+    lo, hi = r.get("window", [0.06, 0.95])
     beat = r.get("cut_len") or 60.0 / style.get("music", {}).get("bpm", 120) * r.get("beats_per_cut", 2)
-    out, ci, use_b = [], 0, True  # first sentence after the title stays on the face
-    for k, (s, e) in enumerate(sentences):
-        if k == 0:  # title sentence stays on the face
-            continue
-        use_b = not use_b
-        if not use_b or s < lo * total or e > hi * total or ci >= len(clips):
-            continue
+    last = sentences[-1][0] if len(sentences) > 2 else total
+    slots = [(s, e) for k, (s, e) in enumerate(sentences)
+             if 0 < k < len(sentences) - 1 and k % 2 == 1 and s >= lo * total and e <= min(hi * total, last)
+             and e - s >= r.get("min_insert", 1.5)]
+    if not clips or not slots:
+        return []
+    if len(clips) < len(slots):  # spread evenly
+        step = len(slots) / len(clips)
+        slots = [slots[int(i * step + step / 2)] for i in range(len(clips))]
+    out, ci = [], 0
+    for s, e in slots:
+        if ci >= len(clips):
+            break
         span = e - s
-        if span < r.get("montage_min", 3.0):  # single insert
+        left = len(clips) - ci
+        if span < r.get("montage_min", 3.0) or left < 2:  # single insert (long sentence: first part only)
             c = clips[ci]; ci += 1
-            out.append(_ins(c, s, span, 1.0, "color", r))
-        else:  # montage on the beat grid
-            n = max(1, int(span // beat))
+            out.append(_ins(c, s, min(span, r.get("max_insert", 4.0)), 1.0, "color", r))
+        else:  # montage on the beat grid, but leave clips for the slots still ahead
+            ahead = len([x for x in slots if x[0] > s])
+            n = max(1, min(int(span // beat), left - ahead))
             t, looks = s, r.get("looks", ["color", "bw"])
             for m in range(n):
-                if ci >= len(clips):
-                    break
-                d = beat if m < n - 1 else e - t
+                d = beat if m < n - 1 else min(e - t, r.get("max_insert", 4.0))
                 c = clips[ci]; ci += 1
                 sp = r.get("slowmo", 0.8) if c["fps"] >= 50 else 1.0
                 out.append(_ins(c, t, d, sp, looks[m % 2], r))
@@ -360,12 +392,12 @@ def run(aroll: str, broll: list[str], style_path: str, out_dir: str, script: str
     out.mkdir(parents=True, exist_ok=True)
     style = json.loads(Path(style_path).read_text())
     refs = style.get("aroll_look", {}).get("lut_ref")
-    if refs:  # style learned from a reference reel: build this video's LUT toward the reference colour
+    if refs and style["aroll_look"].get("use_ref_colour", True):  # style learned from a reference reel: build this video's LUT toward the reference colour
         from .lutmatch import build
         lib = app_root() / "library"
         nm = f"auto_{out.name}"
         build(Path(aroll), [lib / r for r in refs], lib / "luts/my" / f"{nm}.cube",
-              strength=style["aroll_look"].get("lut_strength", 0.7))
+              strength=style["aroll_look"].get("lut_strength", 0.5))
         style["aroll_look"] = dict(style["aroll_look"], lut=f"luts/my/{nm}")
         style["broll_look"] = dict(style.get("broll_look", {}), color=f"luts/my/{nm}")
     if style.get("aroll_look", {}).get("wb") == "auto":  # white point: make whites white for this video
@@ -391,7 +423,17 @@ def run(aroll: str, broll: list[str], style_path: str, out_dir: str, script: str
             except Exception:
                 from .fetch_model import fetch
                 words = transcribe(aroll, out / "words.json", str(fetch()), lang)
+    merged: list[Word] = []
+    for w in words:  # Romanian/French clitics come split by ASR: "ne -a" -> "ne-a", "S -o" -> "S-o"
+        if merged and w.text.startswith("-") and len(w.text) > 1 and w.start - merged[-1].end < 0.3:
+            m = merged[-1]
+            merged[-1] = Word(m.text + w.text, m.start, w.end, min(m.prob, w.prob))
+        else:
+            merged.append(w)
+    words = merged
     spec = plan(Path(aroll).resolve(), [Path(b).resolve() for b in broll], style, words, lines, title)
+    if (lf := out / "lang.txt").exists():
+        spec["lang"] = lf.read_text().strip()
     p = out / "spec.json"
     p.write_text(json.dumps(spec, ensure_ascii=False, indent=1))
     return p

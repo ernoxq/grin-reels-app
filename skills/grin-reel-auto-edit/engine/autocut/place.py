@@ -42,6 +42,38 @@ def find_words(spec: dict, words: str) -> tuple[float, float]:
     raise SystemExit(f"не нашёл слова «{words}» в субтитрах")
 
 
+def _auto_y(spec: dict, sp: Path, file: str | None, icon: str | None, width: float, fallback: float) -> float:
+    """Vertical position (spec units, + = up) that keeps an overlay off the speaker's face and inside the safe zone."""
+    try:
+        from .safezone import DEFAULT, face_box
+        W, H = spec["canvas"]["w"], spec["canvas"]["h"]
+        face = face_box(spec, sp.parent)
+        if not face:
+            return fallback
+        h = 0.12 * H if icon else 0.25 * H
+        if file:
+            import subprocess
+            r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries", "stream=width,height",
+                                "-of", "csv=p=0", file], capture_output=True, text=True).stdout.strip().split(",")
+            if len(r) == 2 and r[0].isdigit():
+                h = W * width * int(r[1]) / int(r[0])
+        z = spec.get("safe_zone") or DEFAULT
+        cs = spec.get("caption_style", {})
+        cap_top = H / 2 - cs.get("y", -0.4) * H / 2 - cs.get("size", 67) * 1.5
+        pad = 30
+        above = face[1] - pad - h / 2
+        below = face[3] + pad + h / 2
+        if above - h / 2 >= z["top"]:
+            cy = above
+        elif below + h / 2 <= cap_top:
+            cy = below
+        else:
+            cy = min(below, z["bottom"] - h / 2)
+        return round((H / 2 - cy) / (H / 2), 3)
+    except Exception:
+        return fallback
+
+
 def place(spec_path: str, file: str | None, words: str | None, at: float | None, how: str = "full",
           dur: float | None = None, pos: str | None = None, width: float | None = None,
           icon: str | None = None, color: str = "#FFFFFF", bg: str | None = "#1E1E1D", label: str | None = None,
@@ -57,7 +89,9 @@ def place(spec_path: str, file: str | None, words: str | None, at: float | None,
     d = dur or max(1.2, min(3.0, t1 - t0 + 0.6))
     d = min(d, spec["duration"] - t0 - 0.05)
     if icon or how in ("window", "sticker"):
-        x, y = POS[pos or "top"]
+        x, y = POS.get(pos or "top", POS["top"])
+        if pos in (None, "auto"):  # keep graphics off the face: above the head if there is room, else on the chest
+            y = _auto_y(spec, sp, file, icon, width or (0.5 if how == "window" else 0.24), y)
         layer = {"start": round(t0, 3), "end": round(t0 + d, 3), "x": x, "y": y, "pop": 0.3, "anim": anim,
                  "width": width or (0.5 if how == "window" else 0.24)}
         if icon:

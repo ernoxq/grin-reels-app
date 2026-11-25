@@ -10,3 +10,4 @@ python-multipart>=0.0.9
 opencv-python-headless>=4.8   # face detection for caption placement (Apache-2.0); optional
 pywebview>=5.0   # native app window (BSD-3)
 resvg-py>=0.5   # icons -> PNG (MPL-2.0 / Apache-2.0)
+onnxruntime>=1.17  # studio: speaker cut-out

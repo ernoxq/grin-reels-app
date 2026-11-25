@@ -53,14 +53,6 @@
    }
   }
  },
- "sticker": {
-  "asset": "stickers/cta/message_button.png",
-  "width": 0.366,
-  "x": 0.0,
-  "y": -0.2625,
-  "pop": 0.4,
-  "capcut_scale": 0.37
- },
  "fade_out": 0.53,
  "music": {
   "asset": null,
@@ -76,14 +68,15 @@
  },
  "broll_rules": {
   "window": [
-   0.08,
-   0.68
+   0.06,
+   0.95
   ],
   "beats_per_cut": 2,
   "montage_min": 3.0,
   "slowmo": 0.8,
   "center_if_longer": 3.0,
-  "_doc": "sentences alternate face/B-roll after the title inside window; long B sentences -> beat montage alternating colour/BW"
+  "_doc": "every other sentence gets an insert (not the title, not the end); few clips are spread evenly over the video; long sentences -> beat montage",
+  "max_insert": 4.0
  },
  "caption_rules": {
   "max_line": 16,
@@ -93,6 +86,6 @@
  "asr": {
   "model": "large-v3-turbo",
   "fallback": "small",
-  "language": "ru"
+  "language": null
  }
 }
