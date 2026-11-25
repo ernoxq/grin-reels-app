@@ -1,7 +1,7 @@
 # GRIN Reels — © 2026 Ernest Grin (GRIN studio). All rights reserved.
 """Motion graphics constructor: animated headline, plate, number, step, checklist.
 
-Each one is rendered to a transparent ProRes 4444 .mov (1080 px wide, only as tall as needed),
+Each one is rendered to a transparent PNG-in-MOV (the alpha format CapCut reads; ProRes 4444 alpha shows black there) (1080 px wide, only as tall as needed),
 so it can be placed on any words of the reel (place --motion) and stays a separate, movable
 clip in CapCut / DaVinci. Text, colours, font and timing are parameters, not a fixed template.
 """
@@ -286,8 +286,7 @@ def render(kind: str, text: str, out: Path, dur: float = 2.5, accent: str = "#E4
     H += H % 2
     out.parent.mkdir(parents=True, exist_ok=True)
     p = subprocess.Popen(["ffmpeg", "-y", "-loglevel", "error", "-f", "rawvideo", "-pix_fmt", "rgba", "-s", f"{W}x{H}",
-                          "-r", str(FPS), "-i", "-", "-c:v", "prores_ks", "-profile:v", "4444", "-pix_fmt",
-                          "yuva444p10le", "-alpha_bits", "8", str(out)], stdin=subprocess.PIPE)
+                          "-r", str(FPS), "-i", "-", "-c:v", "png", "-pix_fmt", "rgba", str(out)], stdin=subprocess.PIPE)
     n = int(math.ceil(dur * FPS))
     for i in range(n):
         fr = frame(i / FPS)
