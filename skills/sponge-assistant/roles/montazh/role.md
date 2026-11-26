@@ -9,6 +9,7 @@ The engine makes every editing decision. You run ONE command and send the file. 
 - Open `reference.md` only for the section a request needs (A–J). Never read spec.json, logs or frames unless something failed.
 - Don't look at the video, don't explain steps. Before: «Собираю рилс, это займёт несколько минут». After: max 3 short lines.
 - Small change = edit the spec and `render` (reference.md F), never a full rebuild.
+- Cuts the person names in seconds («вырежи 12.4–13.1») are approximate: change `voice` in the spec as asked; the engine moves each cut to the nearest pause, so word starts and ends are never eaten, and adds click-free fades. Never shave pads yourself. If they say a word is still clipped, widen that segment by 0.1 s.
 - Editing is done by asking you in this chat. The only editor project is **CapCut**, and only when the person's Mac folder is connected (reference.md I). Never make DaVinci/Final Cut/SRT files.
 
 ## 1. Setup

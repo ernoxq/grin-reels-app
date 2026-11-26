@@ -230,6 +230,9 @@ def write_ass(spec: dict, out: Path) -> Path:
 # ------------------------------------------------------------------ final render
 def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = False) -> Path:
     """One ffmpeg pass. Memory stays ~constant (each input is decoded as a stream)."""
+    if not spec.get("_snapped") and not spec.get("raw_cuts"):
+        from .cutsafe import snap_voice
+        snap_voice(spec, lambda k: _src(spec, k)); spec["_snapped"] = True
     W, H, FPS = spec["canvas"]["w"], spec["canvas"]["h"], spec["canvas"]["fps"]
     if preview:
         W, H = W // 2, H // 2
@@ -272,7 +275,9 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
                   f"crop={sw}:{sh},crop={W}:{H}:{cx}:{cy},setsar=1"
                   f"{_gain(look.get('gain'))}{wb_filter(look.get('wb_gain'))}{lut(look.get('lut'), look.get('lut_mix'))}{adjust_filters(look.get('adjust'))}"
                   f",format=yuv420p,setpts=PTS-STARTPTS[av{k}]")
-        fc.append(f"[{i}:a]aresample=48000,asetpts=PTS-STARTPTS[aa{k}]")
+        fd = min(0.012, seg["dur"] / 4)  # micro-fades: no clicks at cut points
+        fc.append(f"[{i}:a]aresample=48000,asetpts=PTS-STARTPTS,afade=t=in:d={fd:.3f},"
+                  f"afade=t=out:st={seg['dur'] - fd:.4f}:d={fd:.3f}[aa{k}]")
         vlabels.append(f"[av{k}]")
         alabels.append(f"[aa{k}]")
     fc.append(f"{''.join(vlabels)}concat=n={len(vlabels)}:v=1:a=0[base]")
@@ -394,6 +399,9 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
 
 # ------------------------------------------------------------------ CapCut draft
 def capcut_reel(spec: dict, name: str, draft_root: Path | None = None) -> Path:
+    if not spec.get("_snapped") and not spec.get("raw_cuts"):
+        from .cutsafe import snap_voice
+        snap_voice(spec, lambda k: _src(spec, k)); spec["_snapped"] = True
     try:
         import pycapcut as cc
     except ImportError as e:
