@@ -2,9 +2,10 @@
 
 Cuts typed by hand ("cut 12.4 to 13.1") or taken from word timestamps often land
 mid-phoneme, so the first/last sound of a word gets eaten and the hard edge clicks.
-snap_voice() moves every segment edge to the quietest 10 ms frame nearby
-(searching outward, so speech is kept rather than trimmed), then re-times captions,
-titles, B-roll and overlays so nothing drifts. render adds 12 ms micro-fades on top.
+snap_voice() listens at every segment edge: a piece starts where the voice really starts (a sound
+lasting >= 60 ms above the speech threshold, so lip smacks and breaths before a word are left out)
+and ends after the word's natural decay. Short clicks inside kept pauses are listed in seg["duck"]
+and ducked by the renderer. Captions, titles, B-roll and overlays are re-timed so nothing drifts.
 """
 from __future__ import annotations
 
@@ -17,8 +18,6 @@ from .media import FFMPEG
 
 SR = 16000
 HOP = 160  # 10 ms
-REACH_OUT = 0.20  # how far an edge may move away from speech (keeps sound)
-REACH_IN = 0.04   # how far it may move into the kept part (trims a little)
 TIME_KEYS = ("start", "end", "s", "e")
 TIMED = ("captions", "broll", "title", "sticker", "overlays")
 
@@ -32,18 +31,111 @@ def _env(path: str) -> np.ndarray:
     return np.sqrt((x[: n * HOP].reshape(n, HOP) ** 2).mean(1) + 1e-10)
 
 
-def _quietest(env: np.ndarray, t: float, lo: float, hi: float) -> float:
-    a, b = max(0, int((t - lo) * 100)), min(len(env), int((t + hi) * 100) + 1)
-    if b - a < 2:
-        return t
-    w = env[a:b]
-    cur = env[min(len(env) - 1, max(0, int(t * 100)))]
-    if w.min() >= cur * 0.7:  # nothing clearly quieter nearby: leave it
-        return t
-    # the quiet frame closest to the requested time (don't add extra silence)
-    quiet = np.flatnonzero(w <= w.min() * 2 + 1e-4)
-    k = quiet[np.argmin(np.abs(a + quiet - t * 100))]
-    return (a + int(k)) / 100
+def _db(env: np.ndarray) -> np.ndarray:
+    return 20 * np.log10(env + 1e-9)
+
+
+SUSTAIN = 6  # frames (60 ms): real speech lasts; lip smacks / clicks don't
+
+
+def _thr(d: np.ndarray, a: int, b: int) -> float:
+    """Speech threshold for this stretch: 28 dB under its loud parts, at least 12 dB over its floor."""
+    seg = d[max(0, a):min(len(d), b)]
+    if len(seg) < 10:
+        return -45.0
+    return max(float(np.percentile(seg, 3)) + 12, float(np.percentile(seg, 95)) - 28)
+
+
+def _onset(d: np.ndarray, t: float, thr: float, limit: float) -> float:
+    """Where the voice really starts near t (Whisper starts are often 0.3-0.4 s off).
+    From 0.25 s before t: first get out of any sound still going on there (the tail of the
+    previous, cut-away words), then take the first run >= 60 ms above thr; start 30 ms before
+    it so the consonant attack stays. Never later than `limit`."""
+    a, b = max(0, int((t - 0.25) * 100)), min(len(d) - SUSTAIN, int(min(t + 0.6, limit) * 100))
+    i = a
+    while i < b and d[i] > thr:  # still inside earlier sound
+        i += 1
+    if i >= b:  # no pause at all before this word: cut at the quietest point
+        return _dip(d, t)
+    while i < b:
+        if (d[i:i + SUSTAIN] > thr).all():
+            return max(0.0, i / 100 - 0.03)
+        i += 1
+    return t
+
+
+def _offset(d: np.ndarray, t: float, thr: float) -> float:
+    """Where the voice really ends near t: from 0.15 s before t, follow the sound until it stays
+    50 ms under thr-6 dB (or, if it is already quiet there, step back to the last voiced frame),
+    then add 60 ms of natural release. Never runs into the next word."""
+    i = max(0, int((t - 0.15) * 100))
+    stop = min(len(d) - 5, int((t + 0.35) * 100))
+    if (d[i:i + 5] < thr - 6).all():
+        while i > int((t - 0.6) * 100) and d[i] < thr:
+            i -= 1
+        return i / 100 + 0.06
+    while i < stop and not (d[i:i + 5] < thr - 6).all():
+        i += 1
+    if i >= stop:  # words run on without a pause: cut at the quietest point between them
+        return _dip(d, t)
+    return i / 100 + 0.06
+
+
+def _dip(d: np.ndarray, t: float) -> float:
+    a, b = max(0, int((t - 0.15) * 100)), min(len(d), int((t + 0.2) * 100))
+    return (a + int(np.argmin(d[a:b]))) / 100 if b > a else t
+
+
+def _speech_mask(d: np.ndarray, thr: float) -> np.ndarray:
+    """True on frames that belong to a run >= 60 ms above thr (real voice)."""
+    up = d > thr
+    m = np.zeros_like(up)
+    i = 0
+    while i < len(up):
+        if up[i]:
+            j = i
+            while j < len(up) and up[j]:
+                j += 1
+            if j - i >= SUSTAIN:
+                m[i:j] = True
+            i = j
+        else:
+            i += 1
+    return m
+
+
+def clicks(d: np.ndarray, s: float, e: float, thr: float) -> list[tuple[float, float]]:
+    """Lip smacks / clicks inside the pauses of a kept piece: bursts <= 50 ms, >= 15 dB over the
+    pause, inside >= 300 ms without voice, >= 0.1 s away from words. Seconds relative to the piece start, to be ducked."""
+    a, b = max(0, int(s * 100)), min(len(d), int(e * 100))
+    seg = d[a:b]
+    if len(seg) < 12:
+        return []
+    voice = _speech_mask(seg, thr)
+    out, i = [], 0
+    while i < len(seg):
+        if voice[i]:
+            i += 1
+            continue
+        j = i
+        while j < len(seg) and not voice[j]:
+            j += 1
+        if j - i >= 30:  # a real pause (>= 300 ms); stop-consonant closures inside words are shorter
+            q = seg[i:j]
+            floor = float(np.percentile(q, 30))
+            k = 0
+            while k < len(q):
+                if q[k] > floor + 15:
+                    m = k
+                    while m < len(q) and q[m] > floor + 8:
+                        m += 1
+                    # a burst right before a word is its consonant (к, т, п), right after one its tail: keep
+                    if m - k <= 5 and k >= 8 and len(q) - m >= 10:
+                        out.append((round(max(0.0, (i + k) / 100 - 0.01), 3), round((i + m) / 100 + 0.02, 3)))
+                    k = m
+                k += 1
+        i = j
+    return out
 
 
 def snap_voice(spec: dict, src_path) -> dict:
@@ -56,10 +148,11 @@ def snap_voice(spec: dict, src_path) -> dict:
         old.append((t, seg["in"], seg["dur"]))
         t += seg["dur"]
     for k, seg in enumerate(voice):
-        env = _env(str(src_path(seg["src"])))
+        d = _db(_env(str(src_path(seg["src"]))))
         s, e = seg["in"], seg["in"] + seg["dur"]
-        s2 = _quietest(env, s, REACH_OUT, REACH_IN)
-        e2 = _quietest(env, e, REACH_IN, REACH_OUT)
+        thr = _thr(d, int((s - 1) * 100), int((e + 1) * 100))
+        s2 = _onset(d, s + 0.08, thr, e - 0.2)   # pads were added around the words: look from the word itself
+        e2 = _offset(d, e - 0.12, thr)
         # never overlap the neighbour from the same take
         if k and voice[k - 1]["src"] == seg["src"]:
             pe = voice[k - 1]["in"] + voice[k - 1]["dur"]
@@ -69,6 +162,7 @@ def snap_voice(spec: dict, src_path) -> dict:
             e2 = min(e2, voice[k + 1]["in"])
         if e2 - s2 > 0.1:
             seg["in"], seg["dur"] = round(max(0.0, s2), 4), round(e2 - max(0.0, s2), 4)
+        seg["duck"] = clicks(d, seg["in"], seg["in"] + seg["dur"], thr)
 
     new, t = [], 0.0
     for seg in voice:

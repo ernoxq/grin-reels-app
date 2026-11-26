@@ -312,7 +312,8 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
                       f"crop={psw}:{psh},crop={W}:{H}:{max(0, pcx)}:{max(0, pcy)},setsar=1"
                       f"{grade},format=yuv420p,setpts=PTS-STARTPTS[av{k}]")
         fd = min(0.012, seg["dur"] / 4)  # micro-fades: no clicks at cut points
-        fc.append(f"[{i}:a]aresample=48000,asetpts=PTS-STARTPTS,afade=t=in:d={fd:.3f},"
+        duck = "".join(f",volume=0.08:enable='between(t,{a:.3f},{b:.3f})'" for a, b in seg.get("duck") or [])
+        fc.append(f"[{i}:a]aresample=48000,asetpts=PTS-STARTPTS{duck},afade=t=in:d={fd:.3f},"
                   f"afade=t=out:st={seg['dur'] - fd:.4f}:d={fd:.3f}[aa{k}]")
         vlabels.append(f"[av{k}]")
         alabels.append(f"[aa{k}]")
