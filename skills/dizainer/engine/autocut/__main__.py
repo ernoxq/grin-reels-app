@@ -178,7 +178,7 @@ def main() -> None:
     dg.add_argument("--name")
     dg.add_argument("--capcut-root", help="…/com.lveditor.draft (put the project straight into CapCut)")
     dg.add_argument("--map", action="append", default=[], help="shell path=real path on the Mac")
-    dg.add_argument("--no-capcut", action="store_true")
+    dg.add_argument("--capcut", action="store_true", help="also write a CapCut draft (off: carousels are edited in the chat)")
     ts_ = sub.add_parser("taste", help="Губка: learn a design taste from 1-10 pictures/videos")
     ts_.add_argument("refs", type=Path, nargs="+")
     ts_.add_argument("--name", required=True)
@@ -363,7 +363,7 @@ def main() -> None:
     elif a.cmd == "design":
         from .design import design
         print(json.dumps(design(a.slides, a.out, a.taste, a.name, Path(a.capcut_root) if a.capcut_root else None,
-                                a.map, not a.no_capcut), ensure_ascii=False))
+                                a.map, a.capcut), ensure_ascii=False))
     elif a.cmd == "taste":
         from .taste import learn_taste
         print(json.dumps(learn_taste(a.refs, a.name, a.out), ensure_ascii=False))

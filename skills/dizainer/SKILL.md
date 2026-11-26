@@ -1,13 +1,13 @@
 ---
 name: dizainer
-description: Дизайнер. Carousels (up to 10 slides), posts and stories in the creator's taste: ready PNGs + a CapCut project with every text, font and colour editable. Use for «сделай карусель», «сторис».
+description: Дизайнер. Carousels (up to 10 slides), posts and stories in the creator's taste as ready PNGs; every change is made right here in the chat. Use for «сделай карусель», «сторис», «пост».
 ---
 
 <!-- Губка Спанч / GRIN — © 2026 Ernest Grin (GRIN studio). Licensed to the buyer for personal use; resale prohibited. -->
 
 # Дизайнер
 
-The engine does the typography, photos and the CapCut project. You only write a short `slides.json`. Save the person's limits: one command, look at ONE small sheet once, reply in 2-3 lines.
+The engine does the typography and photos and outputs finished PNGs. You only write a short `slides.json`. No CapCut here: CapCut is only for video. Save the person's limits: one command, look at ONE small sheet once, reply in 2-3 lines.
 
 ## 1. Taste first
 Use, in this order: a `taste_*.json` in the connected `Вкус/` folder or one they send → their words («тёмное, строго, жёлтый акцент») → a preset. Have none and the job matters (a series, a brand)? Offer once: «Пришли 5-10 референсов, и я запомню твой вкус» (that's the `gubka-learn` skill). Otherwise don't block: pick a preset and go.
@@ -36,10 +36,11 @@ Their text → use it, only split it into slides. No text → write it by the `s
 ```bash
 [ -d grin ] || cp -r <this skill's folder>/engine ./grin
 pip install --break-system-packages -q numpy Pillow
-cd grin && python -m autocut design ../slides.json --out ../design --no-capcut [--taste /abs/taste_x.json]
+cd grin && python -m autocut design ../slides.json --out ../design [--taste /abs/taste_x.json]
 ```
 It prints JSON: `slides` (PNGs), `sheet`, `warnings`. Fix every warning (shorten the text, cut a list item) and run again. Look at `sheet` ONCE: nothing cut off, accents on the right words, slides not all alike. Fix in slides.json, re-run (1 s).
-Edits are made here in the chat: change slides.json and re-run. A CapCut project only when the person asks for it AND their Mac folder is connected (CapCut needs real paths on their disk): run the same on the computer with `device_bash` in `$HOME/grin` (see the montage skill's reference.md I) without `--no-capcut`, with `--out "$HOME/mnt/<folder>/Готовое" --capcut-root "$HOME/mnt/CapCut/User Data/Projects/com.lveditor.draft" --map "$HOME/mnt/<folder>=<real path>" --map "$HOME/mnt/CapCut=<real path>"`. There every text is its own CapCut layer; restart CapCut to see it.
+Edits are made here in the chat: change slides.json and re-run (1 s), send only the changed slides.
+Folder «Монтаж Claude» connected: same command on the computer with `device_bash` in `$HOME/grin`, `--out "$HOME/mnt/<folder>/Готовое"`.
 
 ## 5. Deliver
 Send the PNGs with SendUserFile (folder mode: just say where). Then: «Готово: N слайдов, можно выкладывать». One offer: «Поменять шрифт, цвет или текст на каком-то слайде? Просто напиши». Remind once: «Перепиши тексты своими словами, если звучит не как ты.»

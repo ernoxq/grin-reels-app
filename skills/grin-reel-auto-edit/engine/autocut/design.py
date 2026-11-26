@@ -1,6 +1,6 @@
 # GRIN Reels — © 2026 Ernest Grin (GRIN studio). All rights reserved.
 # Licensed, not sold: see LICENSE.md. Redistribution or resale is prohibited.
-"""Дизайнер: slides.json -> finished PNG slides + an editable CapCut project.
+"""Дизайнер: slides.json -> finished PNG slides (edits happen in the chat; a CapCut draft only with --capcut).
 
 Claude writes only the words and picks a layout per slide; this module does the
 typography (auto-fit, wrapping, *accent* words), photos, page numbers and the
@@ -479,7 +479,7 @@ def write_capcut(slides: list[tuple[str, list[dict]]], W: int, H: int, out_dir: 
 
 # ------------------------------------------------------------------ one call
 def design(spec_path: Path, out: Path, taste: Path | None = None, name: str | None = None,
-           capcut_root: Path | None = None, maps: list[str] | None = None, capcut: bool = True) -> dict:
+           capcut_root: Path | None = None, maps: list[str] | None = None, capcut: bool = False) -> dict:
     from .nle import _mapper
     spec = json.loads(Path(spec_path).read_text())
     tst = json.loads(Path(taste).read_text()) if taste else None

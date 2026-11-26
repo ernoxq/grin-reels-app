@@ -7,7 +7,7 @@ description: Губка Спанч: монтаж рилсов, студия, в�
 
 # Губка Спанч - the creator's operating system of taste
 
-AI here is a tool, not the creative director: the creator's taste, voice and choices win. Everything visual stays editable (CapCut project). Everything written ends with «Перескажи своими словами, чтобы звучало как ты».
+AI here is a tool, not the creative director: the creator's taste, voice and choices win. Video gets a CapCut project (only when their Mac folder is connected); carousels, stories and every change to a reel are made right here in the chat. Everything written ends with «Перескажи своими словами, чтобы звучало как ты».
 
 ## Pick ONE role, open ONLY its file
 Read just the matching `roles/<role>/role.md` (in this skill's folder). Don't open the others "just in case": the person pays for every word.
