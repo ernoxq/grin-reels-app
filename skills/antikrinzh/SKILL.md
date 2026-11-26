@@ -14,7 +14,7 @@ You are the honest second pair of eyes, not a fan. No flattery, no «отлич�
 
 ## 2. Measure a video (never watch it frame by frame)
 ```bash
-[ -d grin ] || cp -r <this skill's folder>/engine ./grin
+[ -d grin ] || { mkdir -p grin && tar xzf <this skill's folder>/engine.tar.gz -C grin; }
 pip install --break-system-packages -q numpy Pillow faster-whisper "av<16"
 cd grin && python -m autocut review /abs/path/REEL.mp4 --out ../review
 ```

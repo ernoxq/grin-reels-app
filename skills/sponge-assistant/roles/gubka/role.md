@@ -27,8 +27,8 @@ Decide which format it is and say it in one line:
 Never deliver a first version in a different format than the reference: «похоже по темпу» is not «в таком же стиле».
 
 ## Quick mode - just someone else's finished reel (use this by default)
-The engine ships inside this skill under `engine/`.
-1. Copy it to the workspace with `cp -r <this skill's folder>/engine ./grin && cd grin`, then run `pip install --break-system-packages numpy Pillow fonttools faster-whisper "av<16" opencv-python-headless resvg-py`.
+The engine ships inside this skill as `engine.tar.gz`.
+1. Unpack it into the workspace with `[ -d grin ] || { mkdir -p grin && tar xzf <this skill's folder>/engine.tar.gz -C grin; } && cd grin`, then run `pip install --break-system-packages numpy Pillow fonttools faster-whisper "av<16" opencv-python-headless resvg-py`.
 2. Run `python -m autocut style-from-ref REF1.mp4 [REF2.mp4 ... up to 5] --name ref_<short_name>`. This measures the editing pace, the share of B&W shots and the music under the voice. It saves colour reference frames, so every new video gets its own LUT toward that colour. It writes `styles/ref_<name>.json`.
 3. Open `library/looks/ref_<name>/sheet.png` **once** and set only what eyes can judge, in that style file:
    - `caption_style`: `mode` is `phrase` for short phrases or `words` for 1–3 big words with the spoken word lit up. Also set the font (the closest free one; folders are listed in the auto-edit skill), size, `y`, colour, `uppercase`, `box` (plate) and `pop`.

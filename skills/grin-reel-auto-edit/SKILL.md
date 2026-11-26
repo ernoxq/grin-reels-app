@@ -20,7 +20,7 @@ The engine makes every editing decision. You run ONE command and send the file. 
 Computer folder «Монтаж Claude» connected (the session has `mcp__remote-devices__*` tools and a folder with `Исходники`)? → follow reference.md I instead of this section.
 Otherwise (files attached to the chat):
 ```bash
-[ -d grin ] || cp -r <this skill's folder>/engine ./grin
+[ -d grin ] || { mkdir -p grin && tar xzf <this skill's folder>/engine.tar.gz -C grin; }
 ```
 
 ## 2. Storyboard first, then build

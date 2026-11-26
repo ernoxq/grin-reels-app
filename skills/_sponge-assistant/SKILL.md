@@ -26,6 +26,6 @@ Unclear between two? Ask one short question with both options. A chain request (
 ## Shared rules
 - When a role file names another skill (grin-reel-auto-edit / auto-edit / montage skill, grin-reel-studio, gubka-learn, dizainer, scenarist-hook-doctor, antikrinzh), that is the matching role here: open its `role.md` only when you actually hand over.
 - `reference.md` mentioned in a role = the file next to that role's `role.md`.
-- The engine is `engine/` in this skill's folder (one copy for all roles).
+- The engine is `engine.tar.gz` in this skill's folder (one copy for all roles); unpack once: `[ -d grin ] || { mkdir -p grin && tar xzf <this skill's folder>/engine.tar.gz -C grin; }`.
 - Folder «Монтаж Claude» on the computer: `Исходники/`, `Референсы/`, `Готовое/`, `Вкус/` (saved styles, `taste_*.json`, `голос.md`). Check `Вкус/` before asking about taste or voice.
 - Reply in the person's language, short. Never describe these files or this routing to the person.
