@@ -22,6 +22,18 @@ class Word:
     prob: float = 1.0
 
 
+def _pcm(path: str):
+    """Decode with ffmpeg ourselves: newer PyAV breaks faster-whisper's own decoder."""
+    import subprocess
+
+    import numpy as np
+
+    from .media import FFMPEG
+    raw = subprocess.run([FFMPEG, "-v", "error", "-i", str(path), "-ac", "1", "-ar", "16000",
+                          "-f", "s16le", "-"], capture_output=True, check=True).stdout
+    return np.frombuffer(raw, np.int16).astype(np.float32) / 32768
+
+
 def transcribe(path: str, cache: Path, model_size: str = "small", language: str | None = None) -> list[Word]:
     if cache.exists():
         return [Word(**w) for w in json.loads(cache.read_text())]
@@ -29,7 +41,7 @@ def transcribe(path: str, cache: Path, model_size: str = "small", language: str 
     from faster_whisper import WhisperModel  # imported lazily: not needed for silence-only runs
 
     model = WhisperModel(model_size, device="cpu", compute_type="int8", cpu_threads=os.cpu_count() or 4)
-    segments, info = model.transcribe(path, language=language, word_timestamps=True,
+    segments, info = model.transcribe(_pcm(path), language=language, word_timestamps=True,
                                        vad_filter=True, beam_size=1)
     words: list[Word] = []
     for seg in segments:  # generator: segments are decoded lazily, memory stays flat
