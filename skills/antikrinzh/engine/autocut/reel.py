@@ -157,7 +157,9 @@ def write_ass(spec: dict, out: Path) -> Path:
     cap_c = place_block(yc(cs["y"]), gap * (nmax - 1) + cs["size"], z, face)
     up = (lambda x: x.upper()) if cs.get("uppercase") else (lambda x: x)
     def popa(sc: float, st: dict = cs) -> str:  # pop-in that ends at the fitted scale
-        if not st.get("pop"):
+        if st.get("anim") == "rise":  # soft: fades in while sliding up a little
+            return ""
+        if not st.get("pop") and st.get("anim") != "pop":
             return ""
         bx, by = st.get("scale_x", 100) * sc, st.get("scale_y", 100) * sc
         return (f"\\fscx{bx * .9:.0f}\\fscy{by * .9:.0f}\\t(0,120,\\fscx{bx:.0f}\\fscy{by:.0f})")
@@ -205,8 +207,11 @@ def write_ass(spec: dict, out: Path) -> Path:
             for li, line in enumerate(lines):  # one event per line -> exact line pitch like CapCut
                 yy = y0 + li * gap
                 x, tag, sc = fit(line, cs, yy - cs["size"] / 2, yy + cs["size"] / 2)
+                d = int(cs["size"] * 0.35)
+                pos = (f"\\move({int(x)},{int(yy + d)},{int(x)},{int(yy)},0,180)" if cs.get("anim") == "rise"
+                       else f"\\pos({int(x)},{int(yy)})")
                 ev.append(f"Dialogue: 0,{_ass_t(c['start'])},{_ass_t(c['end'])},Cap,,0,0,0,,"
-                          f"{{\\an5\\pos({int(x)},{int(yy)}){tag}{popa(sc)}\\fad({fade},{fade})}}{line}")
+                          f"{{\\an5{pos}{tag}{popa(sc)}\\fad({max(fade, 140) if cs.get('anim') == 'rise' else fade},{fade})}}{line}")
     if t := spec.get("title"):
         lh = ts.get("line_gap", int(ts["size"] * 1.3))
         th = ts["size"] * ts.get("scale_y", 100) / 100
@@ -279,10 +284,14 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
     vsrc = {}  # talking clips with cleaned voice (denoise + -14 LUFS), cached in the job folder
     for key in {seg["src"] for seg in spec["voice"]}:
         vsrc[key] = _src(spec, key) if spec.get("raw_audio") else clean(_src(spec, key), Path(spec["_base"]) / "clean")
+    punch = float(look.get("punch") or 1.0)  # jump-cut punch-in: every other cut a bit closer
     for k, seg in enumerate(spec["voice"]):
         i = add_input(vsrc[seg["src"]], seg["in"], seg["dur"])
-        fc.append(f"[{i}:v]fps={FPS},scale={sw}:{sh}:force_original_aspect_ratio=increase:flags=lanczos,"
-                  f"crop={sw}:{sh},crop={W}:{H}:{cx}:{cy},setsar=1"
+        P = punch if (k % 2 and punch > 1.0) else 1.0
+        psw, psh = int(round(sw * P / 2) * 2), int(round(sh * P / 2) * 2)
+        pcx, pcy = int((psw - W) / 2 - ax * W / 2), int((psh - H) / 2 + ay * H / 2)
+        fc.append(f"[{i}:v]fps={FPS},scale={psw}:{psh}:force_original_aspect_ratio=increase:flags=lanczos,"
+                  f"crop={psw}:{psh},crop={W}:{H}:{max(0, pcx)}:{max(0, pcy)},setsar=1"
                   f"{_gain(look.get('gain'))}{wb_filter(look.get('wb_gain'))}{lut(look.get('lut'), look.get('lut_mix'))}{adjust_filters(look.get('adjust'))}"
                   f",format=yuv420p,setpts=PTS-STARTPTS[av{k}]")
         fd = min(0.012, seg["dur"] / 4)  # micro-fades: no clicks at cut points

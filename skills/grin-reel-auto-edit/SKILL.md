@@ -10,6 +10,11 @@ description: Монтаж. Finished vertical reel from the person's videos and p
 The engine makes every editing decision. You run ONE command and send the file. The person pays for every word you read and write.
 
 ## Save limits (strict)
+- **Never read, grep or edit the engine's code** (`autocut/*.py`, `styles/`, `--help` output). Every wish is a command below or in reference.md. Not covered → say so in one line and offer the closest command; never patch the engine.
+- Budget for one reel: about 10 tool calls (unpack → plan → one `--fix` re-plan → `look`/`scene` → render → send). Going past 15 = stop and tell the person what is blocking.
+- Proofread from the plan text only: `слово(?)` marks words the model is unsure of. Never open `words.json`, confidences or the speech model.
+- Work from inside `grin` (`cd grin` once); job paths like `jobs/r1` are relative to it.
+- Render failed → the error line already says why (ffmpeg's own words). Fix the flag/spec value it names, render once more; don't debug the renderer.
 - Open `reference.md` only for the section a request needs (A–J). Never read spec.json, logs or frames unless something failed.
 - Don't look at the video, don't explain steps. Before: «Собираю рилс, это займёт несколько минут». After: max 3 short lines.
 - Small change = edit the spec and `render` (reference.md F), never a full rebuild.
@@ -43,6 +48,8 @@ No LUT or «cinematic look» unless asked. Asked for a look: one preset at 40-70
 
 ## 4. Any other wish
 Content (what stays, order, words, title) → plan flags. Something on screen at certain words → `place`. Fonts, colours, music, captions → reference.md D. Their vibe from 1-5 reels → `gubka-learn`. Studio format → `grin-reel-studio`. Link to a reference → reference.md J. Anything else → one small ffmpeg step on `final.mp4`.
+
+**Caption look + punch-in (one command, then render):** `python -m autocut look jobs/r1/spec.json --captions minimal|bold|box|words [--size 58] [--y -0.4] [--font "Montserrat Medium|SemiBold|Bold|Black, Inter …, Oswald"] [--upper|--no-upper] [--color "#FFFFFF"] [--highlight "#F6DB92"] [--anim rise|pop|fade] [--punch 1.06]`. «аккуратные/минималистичные субтитры» → `minimal`; «крупные» → `bold`; «слово подсвечивается» → `words`; «на плашке» → `box`; «зум на склейках / динамичнее» → `--punch 1.06` (1.10 strong).
 
 **Designer scenes (default for talking-head reels over 20 s, unless they say «просто»):** from the plan, pick 2–3 moments: a strong claim → `card`, an enumeration → `split`. Never in the first 1.5 s; ~1 scene per 10 s; key = 2–4 words that carry the meaning.
 ```bash

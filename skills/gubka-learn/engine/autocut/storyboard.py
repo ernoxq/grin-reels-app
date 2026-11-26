@@ -70,7 +70,8 @@ def plan_text(job: Path) -> str:
         ts = [out_time(w) for w in s]
         txt = " ".join(w["text"] for w in s)
         if any(x is not None for x in ts):
-            txt = " ".join(w["text"] for w, x in zip(s, ts) if x is not None).replace(" -", "-")
+            txt = " ".join(w["text"] + ("(?)" if w.get("prob", 1) < 0.45 else "")
+                           for w, x in zip(s, ts) if x is not None).replace(" -", "-")
             kept.append((min(x for x in ts if x is not None), txt))
         else:
             cut.append(txt)
@@ -83,7 +84,7 @@ def plan_text(job: Path) -> str:
             lines.append("Вставки: " + ", ".join(f"{Path(spec['sources'][b['src']]).name} на {b['start']:.0f} с"
                                                  for b in sorted(spec["broll"], key=lambda b: b["start"])))
         return "\n".join(lines)
-    lines.append("Остаётся:")
+    lines.append("Остаётся (слово(?) = модель не уверена, проверь его):")
     for i, (t0, txt) in enumerate(kept, 1):
         nxt = kept[i][0] if i < len(kept) else spec["duration"]
         here = [b for b in ins if t0 - 0.05 <= b["start"] < nxt]

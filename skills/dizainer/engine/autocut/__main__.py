@@ -157,6 +157,13 @@ def main() -> None:
     so.add_argument("--capcut", help="also write a layered CapCut project with this name")
     so.add_argument("--capcut-root"); so.add_argument("--media-dir"); so.add_argument("--map", nargs="*", default=[])
     sub.add_parser("studio-help", help="scene types for scenes.json")
+    lk = sub.add_parser("look", help="caption look preset + punch-in zoom (look.py)")
+    lk.add_argument("spec"); lk.add_argument("--captions", choices=["minimal", "bold", "box", "words"])
+    lk.add_argument("--size", type=int); lk.add_argument("--y", type=float); lk.add_argument("--font")
+    lk.add_argument("--upper", dest="upper", action="store_true", default=None)
+    lk.add_argument("--no-upper", dest="upper", action="store_false")
+    lk.add_argument("--color"); lk.add_argument("--highlight"); lk.add_argument("--anim", choices=["rise", "pop", "fade"])
+    lk.add_argument("--punch", type=float)
     sc = sub.add_parser("scene", help="speaker shrinks into a card / half screen, words typeset around (scenes.py)")
     sc.add_argument("spec"); sc.add_argument("kind", choices=["card", "split", "clear"])
     sc.add_argument("--from", dest="frm"); sc.add_argument("--to"); sc.add_argument("--key"); sc.add_argument("--list")
@@ -351,6 +358,10 @@ def main() -> None:
             r.update(capcut(job, Path(a.scenes), a.capcut, root, Path(a.media_dir) if a.media_dir else job / "studio" / "capcut_media",
                             Path(a.video) if a.video else None, a.map))
         print(r["plan"] if a.plan else json.dumps(r, ensure_ascii=False))
+    elif a.cmd == "look":
+        from .look import look
+        print(json.dumps(look(a.spec, a.captions, a.size, a.y, a.font, a.upper, a.color, a.highlight, a.anim,
+                              a.punch), ensure_ascii=False))
     elif a.cmd == "scene":
         from .scenes import scene
         print(json.dumps(scene(a.spec, a.kind, a.frm, a.to, a.key, a.list), ensure_ascii=False))

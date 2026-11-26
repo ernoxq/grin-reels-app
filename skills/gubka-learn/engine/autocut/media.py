@@ -62,7 +62,11 @@ def probe(path: str | Path) -> MediaInfo:
 
 
 def run(cmd: list[str]) -> subprocess.CompletedProcess:
-    return subprocess.run(cmd, capture_output=True, text=True, check=True)
+    r = subprocess.run(cmd, capture_output=True, text=True)
+    if r.returncode:  # show WHY right away (no digging through logs)
+        tail = "\n".join((r.stderr or "").strip().splitlines()[-8:])
+        raise RuntimeError(f"ffmpeg failed: {tail or 'no message'}")
+    return r
 
 
 def h264_encoder() -> list[str]:
