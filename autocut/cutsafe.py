@@ -65,24 +65,37 @@ def _onset(d: np.ndarray, t: float, thr: float, limit: float) -> float:
 
 
 def _offset(d: np.ndarray, t: float, thr: float) -> float:
-    """Where the voice really ends near t: from 0.15 s before t, follow the sound until it stays
-    50 ms under thr-6 dB (or, if it is already quiet there, step back to the last voiced frame),
-    then add 60 ms of natural release. Never runs into the next word."""
-    i = max(0, int((t - 0.15) * 100))
-    stop = min(len(d) - 5, int((t + 0.35) * 100))
-    if (d[i:i + 5] < thr - 6).all():
-        while i > int((t - 0.6) * 100) and d[i] < thr:
-            i -= 1
-        return i / 100 + 0.06
-    while i < stop and not (d[i:i + 5] < thr - 6).all():
-        i += 1
-    if i >= stop:  # words run on without a pause: cut at the quietest point between them
+    """Where the voice really ends near t. Find the first 120 ms without a sounding run after t-0.15 (up to t+0.5;
+    a dip inside a word, like between «жиз» and «ни» or before «ц» in «месяца», is shorter), then end 60 ms after the
+    last sounding run >= 30 ms before that point (so a lone click after the word stays out)."""
+    a = max(0, int((t - 0.15) * 100))
+    stop = min(len(d) - 12, int((t + 0.5) * 100))
+    def voiced_run(x: np.ndarray) -> bool:  # any >= 30 ms above thr (a lone click is shorter)
+        up = x > thr
+        return any(up[k:k + 3].all() for k in range(len(up) - 2))
+
+    q = a
+    # 120 ms with no sounding run: the word is over (closures inside words, before ц/т/к, are shorter)
+    while q < stop and voiced_run(d[q:q + 12]):
+        q += 1
+    if q >= stop:  # words run on without a pause: cut at the quietest point between them
         return _dip(d, t)
-    return i / 100 + 0.06
+    last, i = None, max(0, int((t - 0.6) * 100))
+    while i < q:
+        if d[i] > thr:
+            j = i
+            while j < q and d[j] > thr:
+                j += 1
+            if j - i >= 3:
+                last = j
+            i = j
+        else:
+            i += 1
+    return (last if last is not None else q) / 100 + 0.06
 
 
 def _dip(d: np.ndarray, t: float) -> float:
-    a, b = max(0, int((t - 0.15) * 100)), min(len(d), int((t + 0.2) * 100))
+    a, b = max(0, int((t - 0.15) * 100)), min(len(d), int((t + 0.35) * 100))
     return (a + int(np.argmin(d[a:b]))) / 100 if b > a else t
 
 
