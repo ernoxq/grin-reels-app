@@ -6,6 +6,11 @@
 The engine makes every editing decision. You run ONE command and send the file. The person pays for every word you read and write.
 
 ## Save limits (strict)
+- **Never read, grep or edit the engine's code** (`autocut/*.py`, `styles/`, `--help` output). Every wish is a command below or in reference.md. Not covered → say so in one line and offer the closest command; never patch the engine.
+- Budget for one reel: about 10 tool calls (unpack → plan → one `--fix` re-plan → `look`/`scene` → render → send). Going past 15 = stop and tell the person what is blocking.
+- Proofread from the plan text only: `слово(?)` marks words the model is unsure of. Never open `words.json`, confidences or the speech model.
+- Work from inside `grin` (`cd grin` once); job paths like `jobs/r1` are relative to it.
+- Render failed → the error line already says why (ffmpeg's own words). Fix the flag/spec value it names, render once more; don't debug the renderer.
 - Open `reference.md` only for the section a request needs (A–J). Never read spec.json, logs or frames unless something failed.
 - Don't look at the video, don't explain steps. Before: «Собираю рилс, это займёт несколько минут». After: max 3 short lines.
 - Small change = edit the spec and `render` (reference.md F), never a full rebuild.
@@ -24,7 +29,8 @@ Otherwise (files attached to the chat):
 nohup bash grin/run.sh <ALL attached videos and photos, absolute paths> --plan --out grin/jobs/r1 [options] > grin/out.txt 2>&1 &
 ```
 Wait cheaply: `sleep 120; tail -25 grin/out.txt` until the plan appears (~1.5 min per minute of raw video).
-Fix obvious recognition mistakes yourself with `--fix "wrong=right"` (one or several words; you know the language) and drop clear stumbles/repeats with `--drop`, re-plan once. Show the plan as it is and ask: «Собираю так или что-то поменять?». Apply, re-plan (fast, no new recognition):
+**Captions must be CapCut-level or better: proofread every plan before showing it.** Read the whole text once like an editor: misheard words («к Лоду»→«Клоду», «клад»→«Клод», «Терраспалета не обойдет с стороной»→«Тирасполь это не обойдёт стороной»), names and brands, case endings, numbers. Fix ALL of them in one `--fix "wrong=right" ...` re-plan (several words → any number of words, timing is kept); you know the language and the meaning, Whisper doesn't. Never paraphrase what they said, only what was misheard. Drop clear stumbles/repeats with `--drop`.
+First run: pass `--vocab "names, brands, terms"` you already know (their name, brand, city, Claude/CapCut...; folder mode: the contents of `Вкус/словарь.txt` if it exists). When they correct a word, offer once to add it to `Вкус/словарь.txt`.
 - `--drop "фраза"` (undo `--keep`), `--title "..."`; same `--out` remembers earlier choices; a new reel gets a new `--out`.
 - photo / video / icon on certain words: `place` (reference.md E); animated text: reference.md J.
 Render: `cd grin && nohup python -m autocut finish jobs/r1 > out.txt 2>&1 &`, poll, read the JSON line.
@@ -38,6 +44,10 @@ No LUT or «cinematic look» unless asked. Asked for a look: one preset at 40-70
 
 ## 4. Any other wish
 Content (what stays, order, words, title) → plan flags. Something on screen at certain words → `place`. Fonts, colours, music, captions → reference.md D. Their vibe from 1-5 reels → `gubka-learn`. Studio format → `grin-reel-studio`. Link to a reference → reference.md J. Anything else → one small ffmpeg step on `final.mp4`.
+
+**Caption look + punch-in (one command, then render):** `python -m autocut look jobs/r1/spec.json --captions minimal|bold|box|words [--size 58] [--y -0.4] [--font "Montserrat Medium|SemiBold|Bold|Black, Inter …, Oswald"] [--upper|--no-upper] [--color "#FFFFFF"] [--highlight "#F6DB92"] [--anim rise|pop|fade] [--punch 1.06]`. «аккуратные/минималистичные субтитры» → `minimal`; «крупные» → `bold`; «слово подсвечивается» → `words`; «на плашке» → `box`; «зум на склейках / динамичнее» → `--punch 1.06` (1.10 strong).
+Same command: `--frame fill|fit|blur` (horizontal video gets `blur` automatically: whole frame, captions under it; «как на скрине, чёрный фон» → `fit`; «на весь экран» → `fill`), `--music FILE --music-db -20` («тихонько» −20, «фоном» −16; looped and faded by the engine).
+**A screenshot or reel of the wanted look attached → open it ONCE before the first render** and translate it into `look`/`scene` flags (layout, caption size, position, case, animation). Never render first and compare afterwards.
 
 **Designer scenes (default for talking-head reels over 20 s, unless they say «просто»):** from the plan, pick 2–3 moments: a strong claim → `card`, an enumeration → `split`. Never in the first 1.5 s; ~1 scene per 10 s; key = 2–4 words that carry the meaning.
 ```bash

@@ -223,6 +223,16 @@ def chunk_captions(kept: list[Phrase], mp, max_line=16, max_chars=34, max_words=
             if w.text.endswith((",", ".", "!", "?", ";", ":")):
                 flush()
         flush()
+    i = 0  # a lone short word («ну», «вот») flashes for a frame: join it to the next caption
+    while i < len(caps) - 1:
+        a, b = caps[i], caps[i + 1]
+        if (len(a["words"]) == 1 and a["end"] - a["start"] < 0.5 and b["start"] - a["end"] < 0.4
+                and len(b["words"]) < max_words + 1):
+            txt = a["text"].replace("\n", " ") + " " + b["text"].replace("\n", " ")
+            caps[i + 1] = dict(b, text=_wrap(txt, max_line), start=a["start"], words=a["words"] + b["words"])
+            del caps[i]
+            continue
+        i += 1
     for a, b in zip(caps, caps[1:]):  # captions hold until the next one (no flicker)
         a["end"] = b["start"] if b["start"] - a["end"] < 0.35 else a["end"] + 0.15
     for c in caps:
@@ -344,7 +354,9 @@ def plan(aroll: Path, broll: list[Path], style: dict, words: list[Word], script:
 
     # title = first sentence
     ts = style.get("title")
-    if ts and caps:
+    first_txt = caps[0]["text"].replace("\n", " ").split() if caps else []
+    weak_first = len(first_txt) < 2 or sum(len(re.sub(r"\W", "", w)) for w in first_txt) < 8
+    if ts and caps and (title or not weak_first):  # «НУ» / «ВОТ» is not a title: keep it as a caption
         first = caps[0]
         txt = (title or first["text"].replace("\n", " ")).upper().split()
         mid = max(1, len(txt) // 2)
