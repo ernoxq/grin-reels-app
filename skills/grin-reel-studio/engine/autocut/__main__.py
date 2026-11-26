@@ -171,6 +171,24 @@ def main() -> None:
     pk.add_argument("files", nargs="+")
     sub.add_parser("presets", help="(re)build colour presets -> library/luts/presets")
 
+    dg = sub.add_parser("design", help="Дизайнер: slides.json -> PNG slides + editable CapCut project")
+    dg.add_argument("slides", type=Path)
+    dg.add_argument("--out", type=Path, default=Path("design_out"))
+    dg.add_argument("--taste", type=Path, help="taste_<name>.json from `taste`")
+    dg.add_argument("--name")
+    dg.add_argument("--capcut-root", help="…/com.lveditor.draft (put the project straight into CapCut)")
+    dg.add_argument("--map", action="append", default=[], help="shell path=real path on the Mac")
+    dg.add_argument("--no-capcut", action="store_true")
+    ts_ = sub.add_parser("taste", help="Губка: learn a design taste from 1-10 pictures/videos")
+    ts_.add_argument("refs", type=Path, nargs="+")
+    ts_.add_argument("--name", required=True)
+    ts_.add_argument("--out", type=Path)
+    rv = sub.add_parser("review", help="Антикринж: measure a finished reel (pace, hook, pauses, transcript, sheet)")
+    rv.add_argument("reel", type=Path)
+    rv.add_argument("--out", type=Path)
+    rv.add_argument("--no-speech", action="store_true")
+    rv.add_argument("--lang")
+
     sv = sub.add_parser("serve")
     sv.add_argument("--host", default="0.0.0.0")
     sv.add_argument("--port", type=int, default=8765)
@@ -342,6 +360,19 @@ def main() -> None:
     elif a.cmd == "presets":
         from .grade import build_presets
         print(len(build_presets()), "presets")
+    elif a.cmd == "design":
+        from .design import design
+        print(json.dumps(design(a.slides, a.out, a.taste, a.name, Path(a.capcut_root) if a.capcut_root else None,
+                                a.map, not a.no_capcut), ensure_ascii=False))
+    elif a.cmd == "taste":
+        from .taste import learn_taste
+        print(json.dumps(learn_taste(a.refs, a.name, a.out), ensure_ascii=False))
+    elif a.cmd == "review":
+        from .review import review
+        r = review(a.reel, a.out or Path("review") / a.reel.stem, not a.no_speech, a.lang)
+        print(json.dumps({k: v for k, v in r.items() if k != "transcript"}, ensure_ascii=False))
+        for p in r.get("transcript", []):
+            print(f"[{p['t']}] {p['text']}")
     elif a.cmd == "serve":
         import uvicorn
         uvicorn.run("autocut.server:app", host=a.host, port=a.port, workers=1)

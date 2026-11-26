@@ -1,6 +1,6 @@
 ---
 name: grin-reel-studio
-description: Make a "studio" reel - the speaker cut out of the room onto a calm light set, dark-green animated cards (title, name plate with photo, quote typed in sync, opening Bible, checklist, headlines) above the head, yellow captions in the safe zone - plus an optional layered CapCut project. Use for «сделай как этот референс» when the reference is in this format, «шаблон студия», «вырежи меня на фон с карточками».
+description: Монтаж: Студия. Speaker cut out onto a light set with animated cards above the head, captions in the safe zone, layered CapCut project. Use for «шаблон студия», «вырежи меня на фон с карточками».
 ---
 
 <!-- GRIN Reels skill — © 2026 Ernest Grin (GRIN studio). All rights reserved. Licensed to the buyer for personal use; redistribution or resale prohibited. See LICENSE.md in the GRIN Reels folder. -->

@@ -1,6 +1,6 @@
 ---
 name: grin-reel-auto-edit
-description: Make a finished vertical reel (Instagram/TikTok/Shorts) from whatever videos and photos the person drops into the chat — joins all talking parts, cuts pauses and bad takes, adds subtitles in the spoken language, title, colour, inserts and an end button — with the GRIN Reels engine bundled in this skill. Use for «собери рилс», «смонтируй видео», «сделай рилс из этого».
+description: Монтаж. Finished vertical reel from the person's videos and photos: cuts pauses and bad takes, subtitles, title, colour, inserts, motion text + a CapCut project. Use for «собери рилс», «смонтируй».
 ---
 
 <!-- GRIN Reels skill — © 2026 Ernest Grin (GRIN studio). All rights reserved. Licensed to the buyer for personal use; redistribution or resale prohibited. -->
@@ -19,7 +19,8 @@ The engine makes every editing decision. Your job is to run ONE command and send
 If the session has `mcp__remote-devices__*` tools, call `get_device_info`. If a connected folder contains `Исходники` (or the person names their editing folder), work there and do NOT ask them to attach files:
 - `Исходники/` - raw videos and photos (one reel at a time, or a subfolder per reel - take the one they name, else the newest files);
 - `Референсы/` - reels or pictures whose style to copy (use them only if the person asks for that style);
-- `Готовое/` - results go here. Create the three folders if the connected folder is empty.
+- `Готовое/` - results go here;
+- `Вкус/` - the creator's saved taste: reel styles `ref_*.json` (pass with `--style`), `taste_*.json` for carousels, `голос.md` for texts. Create the four folders if the connected folder is empty.
 
 Run it on the computer with `device_bash` (it has 4 cores and sees the files; nothing is uploaded):
 ```bash
@@ -86,11 +87,11 @@ Each is a separate clip in the CapCut / DaVinci project, so it stays editable. D
 - About the content (what stays, order, words, title): storyboard flags `--drop`, `--keep`, `--fix`, `--title`, `--talking` (order of the parts = order you list them).
 - Something on screen at certain words: `place` (photo, video window, icon, sticker) or `place --motion` (animated text).
 - Fonts, colours, music, end button, captions look: `apply_choices` / style fields (reference.md B-D).
-- The person's whole vibe from 1-5 reels: style-learn skill.
+- The person's whole vibe from 1-5 reels: `gubka-spanch` skill (styles saved in `Вкус/`).
 - Anything the engine has no option for: do it as a small extra step on `final.mp4` with ffmpeg (one command, `-loglevel error`), or tell them it is a manual touch in CapCut - the project is there.
 
 ## 3. Deliver
-Send the `video` path from the JSON with SendUserFile (folder mode: just say where it is). Then 2–3 lines: length, which clips became the talk, language. One offer: «Могу поменять шрифт, цвет, заголовок или поставить фото на нужные слова».
+Send the `video` path from the JSON with SendUserFile (folder mode: just say where it is). Then 2–3 lines: length, which clips became the talk, language. One offer: «Могу поменять шрифт, цвет, заголовок или поставить фото на нужные слова» or «Проверить на кринж перед публикацией?» (antikrinzh skill).
 
 ## 4. If it fails
 Read only the last 15 lines of `grin/grin.log`. Explain in plain words with the fix, never a traceback:
