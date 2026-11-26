@@ -87,7 +87,7 @@ Each is a separate clip in the CapCut / DaVinci project, so it stays editable. D
 - About the content (what stays, order, words, title): storyboard flags `--drop`, `--keep`, `--fix`, `--title`, `--talking` (order of the parts = order you list them).
 - Something on screen at certain words: `place` (photo, video window, icon, sticker) or `place --motion` (animated text).
 - Fonts, colours, music, end button, captions look: `apply_choices` / style fields (reference.md B-D).
-- The person's whole vibe from 1-5 reels: `gubka-spanch` skill (styles saved in `Вкус/`).
+- The person's whole vibe from 1-5 reels: `gubka-learn` skill (styles saved in `Вкус/`).
 - Anything the engine has no option for: do it as a small extra step on `final.mp4` with ffmpeg (one command, `-loglevel error`), or tell them it is a manual touch in CapCut - the project is there.
 
 ## 3. Deliver

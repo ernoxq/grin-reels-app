@@ -10,7 +10,7 @@ description: Дизайнер. Carousels (up to 10 slides), posts and stories in
 The engine does the typography, photos and the CapCut project. You only write a short `slides.json`. Save the person's limits: one command, look at ONE small sheet once, reply in 2-3 lines.
 
 ## 1. Taste first
-Use, in this order: a `taste_*.json` in the connected `Вкус/` folder or one they send → their words («тёмное, строго, жёлтый акцент») → a preset. Have none and the job matters (a series, a brand)? Offer once: «Пришли 5-10 референсов, и я запомню твой вкус» (that's the `gubka-spanch` skill). Otherwise don't block: pick a preset and go.
+Use, in this order: a `taste_*.json` in the connected `Вкус/` folder or one they send → their words («тёмное, строго, жёлтый акцент») → a preset. Have none and the job matters (a series, a brand)? Offer once: «Пришли 5-10 референсов, и я запомню твой вкус» (that's the `gubka-learn` skill). Otherwise don't block: pick a preset and go.
 Presets: `clean` (светлый, рыжий акцент), `night` (чёрный, лаймовый), `editorial` (журнал, антиква), `soft` (беж, мягкий), `bold` (тёмно-зелёный, жёлтый, капс).
 
 ## 2. Words

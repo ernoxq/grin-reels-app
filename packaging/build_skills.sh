@@ -30,16 +30,35 @@ design() {  # designer engine: fonts of the presets + CapCut template
 
 full   $S/grin-reel-auto-edit/engine
 full   $S/grin-reel-studio/engine
-full   $S/gubka-spanch/engine
+full   $S/gubka-learn/engine
 design $S/dizainer/engine
 core   $S/antikrinzh/engine
 
+# --- one skill with all six roles (what buyers install): router + roles/<role>/role.md + ONE engine
+G=$S/gubka-spanch
+rm -rf $G; mkdir -p $G/roles
+cp $S/_gubka-spanch/SKILL.md $G/
+role() {  # $1 = source skill, $2 = role folder: body without the frontmatter, plus its reference.md
+  mkdir -p $G/roles/$2
+  awk 'BEGIN{n=0} /^---$/ && n<2 {n++; next} n>=2' $S/$1/SKILL.md > $G/roles/$2/role.md
+  [ -f $S/$1/reference.md ] && cp $S/$1/reference.md $G/roles/$2/ || true
+}
+role grin-reel-auto-edit montazh
+role grin-reel-studio studio
+role gubka-learn gubka
+role dizainer dizainer
+role scenarist-hook-doctor scenarist
+role antikrinzh antikrinzh
+full $G/engine
+D=$(mktemp -d); design $D
+cp -r --update=none $D/library/fonts/* $G/engine/library/fonts/; rm -rf $D
+
 cd $S
 rm -f ./*.zip
-for d in grin-reel-auto-edit grin-reel-studio gubka-spanch dizainer antikrinzh scenarist-hook-doctor; do
+for d in gubka-spanch grin-reel-auto-edit grin-reel-studio gubka-learn dizainer antikrinzh scenarist-hook-doctor; do
   zip -qr "$d.zip" "$d" -x '*.DS_Store' -x '*/__pycache__/*'
 done
-for d in */SKILL.md; do  # claude.ai rejects descriptions over 200 characters
+for d in */SKILL.md _gubka-spanch/SKILL.md; do  # claude.ai rejects descriptions over 200 characters
   n=$(grep -m1 '^description:' "$d" | sed 's/^description: //' | python3 -c 'import sys; print(len(sys.stdin.read().strip()))')
   [ "$n" -le 200 ] || { echo "TOO LONG ($n): $d"; exit 1; }
 done
