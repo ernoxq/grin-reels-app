@@ -10,6 +10,9 @@ then: python -m autocut render jobs/r1/spec.json --out jobs/r1/final.mp4
 --font      Montserrat Medium|SemiBold|Bold|Black, Inter Medium|SemiBold|Bold|Black, Oswald
 --upper / --no-upper   --color "#FFFFFF"   --highlight "#F6DB92" (words mode)
 --anim      rise | pop | fade
+--frame     fill (crop to vertical, default) | fit (whole horizontal frame on black, captions under it) |
+            blur (whole frame over its own blurred copy)
+--music     file.mp3 [--music-db -20]: background track, looped, faded; -16 audible, -20 quiet («тихонько»), -24 barely
 --punch     1.0 off, 1.06 subtle, 1.10 strong: every other cut is a bit closer (classic talking-head rhythm)
 """
 from __future__ import annotations
@@ -37,7 +40,7 @@ PRESETS = {
 
 
 def look(spec_path: str, captions=None, size=None, y=None, font=None, upper=None, color=None,
-         highlight=None, anim=None, punch=None) -> dict:
+         highlight=None, anim=None, punch=None, frame=None, music=None, music_db=None) -> dict:
     sp = Path(spec_path)
     spec = json.loads(sp.read_text())
     cs = spec["caption_style"]
@@ -61,6 +64,48 @@ def look(spec_path: str, captions=None, size=None, y=None, font=None, upper=None
         spec["fonts"].append(f)
     if punch is not None:
         spec.setdefault("aroll_look", {})["punch"] = punch
+    if frame:
+        spec.setdefault("aroll_look", {})["frame"] = frame
+        if frame in ("fit", "blur") and y is None:  # captions just under the horizontal frame
+            import subprocess
+            from .reel import FRAME_TOP, _p
+            src = _p(dict(spec, _base=str(sp.parent)), spec["sources"][spec["voice"][0]["src"]])
+            wh = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                                 "stream=width,height:stream_side_data=rotation", "-of", "csv=p=0", src],
+                                capture_output=True, text=True).stdout.split()[0].split(",")
+            w, h = int(wh[0]), int(wh[1])
+            W, H = spec["canvas"]["w"], spec["canvas"]["h"]
+            fh = W * h / w
+            bottom = (H - fh) * FRAME_TOP + fh
+            cs["y"] = round(max(-0.6, 1 - 2 * (bottom + 0.07 * H) / H), 3)
+            spec["avoid_face"] = False
+    if music:
+        spec["music"] = {"asset": str(Path(music).resolve()), "gain_db": music_db if music_db is not None else -20}
+    elif music_db is not None and spec.get("music"):
+        spec["music"]["gain_db"] = music_db
     sp.write_text(json.dumps(spec, ensure_ascii=False, indent=1))
     return {"captions": {k: cs.get(k) for k in ("font_name", "size", "y", "uppercase", "anim", "mode")},
-            "punch": spec.get("aroll_look", {}).get("punch", 1.0)}
+            "punch": spec.get("aroll_look", {}).get("punch", 1.0), "frame": spec.get("aroll_look", {}).get("frame", "fill"),
+            "music": spec.get("music")}
+
+
+def auto_frame(spec_path) -> str | None:
+    """Horizontal talking video: show the whole frame (blur) instead of cropping the head off."""
+    import subprocess
+    from .reel import _p
+    sp = Path(spec_path)
+    spec = json.loads(sp.read_text())
+    if spec.get("aroll_look", {}).get("frame") or not spec.get("voice"):
+        return None
+    src = _p(dict(spec, _base=str(sp.parent)), spec["sources"][spec["voice"][0]["src"]])
+    r = subprocess.run(["ffprobe", "-v", "error", "-select_streams", "v:0", "-show_entries",
+                        "stream=width,height:stream_side_data=rotation", "-of", "default=nw=1", src],
+                       capture_output=True, text=True).stdout
+    vals = dict(l.split("=", 1) for l in r.splitlines() if "=" in l)
+    w, h = int(vals.get("width", 0)), int(vals.get("height", 0))
+    if abs(int(float(vals.get("rotation", 0) or 0))) in (90, 270):
+        w, h = h, w
+    if w > h * 1.1:
+        look(str(sp), frame="blur")
+        return "blur"
+    return None

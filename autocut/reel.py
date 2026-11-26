@@ -26,6 +26,9 @@ ROOT = app_root()
 
 
 # ------------------------------------------------------------------ helpers
+FRAME_TOP = 0.42  # fit/blur: where the horizontal frame sits (0 = top, 1 = bottom of the free space)
+
+
 def load_spec(path: str | Path) -> dict:
     spec = json.loads(Path(path).read_text())
     base = Path(path).resolve().parent
@@ -290,10 +293,24 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
         P = punch if (k % 2 and punch > 1.0) else 1.0
         psw, psh = int(round(sw * P / 2) * 2), int(round(sh * P / 2) * 2)
         pcx, pcy = int((psw - W) / 2 - ax * W / 2), int((psh - H) / 2 + ay * H / 2)
-        fc.append(f"[{i}:v]fps={FPS},scale={psw}:{psh}:force_original_aspect_ratio=increase:flags=lanczos,"
-                  f"crop={psw}:{psh},crop={W}:{H}:{max(0, pcx)}:{max(0, pcy)},setsar=1"
-                  f"{_gain(look.get('gain'))}{wb_filter(look.get('wb_gain'))}{lut(look.get('lut'), look.get('lut_mix'))}{adjust_filters(look.get('adjust'))}"
-                  f",format=yuv420p,setpts=PTS-STARTPTS[av{k}]")
+        grade = (f"{_gain(look.get('gain'))}{wb_filter(look.get('wb_gain'))}{lut(look.get('lut'), look.get('lut_mix'))}"
+                 f"{adjust_filters(look.get('adjust'))}")
+        frame = look.get("frame", "fill")
+        if frame in ("fit", "blur"):  # horizontal video: whole frame visible, slightly above centre
+            top = FRAME_TOP
+            fg = f"scale={W}:-2:flags=lanczos,setsar=1{grade}"
+            if frame == "fit":
+                fc.append(f"[{i}:v]fps={FPS},{fg},pad={W}:{H}:0:'trunc((oh-ih)*{top}/2)*2':color=black,"
+                          f"format=yuv420p,setpts=PTS-STARTPTS[av{k}]")
+            else:  # same video, blurred and darker, fills the rest
+                fc.append(f"[{i}:v]fps={FPS},split[bg{k}][fg{k}];"
+                          f"[bg{k}]scale={W}:{H}:force_original_aspect_ratio=increase,crop={W}:{H},boxblur=28:2,"
+                          f"eq=brightness=-0.12:saturation=0.8,setsar=1{grade}[bb{k}];[fg{k}]{fg}[ff{k}];"
+                          f"[bb{k}][ff{k}]overlay=0:'(H-h)*{top}',format=yuv420p,setpts=PTS-STARTPTS[av{k}]")
+        else:
+            fc.append(f"[{i}:v]fps={FPS},scale={psw}:{psh}:force_original_aspect_ratio=increase:flags=lanczos,"
+                      f"crop={psw}:{psh},crop={W}:{H}:{max(0, pcx)}:{max(0, pcy)},setsar=1"
+                      f"{grade},format=yuv420p,setpts=PTS-STARTPTS[av{k}]")
         fd = min(0.012, seg["dur"] / 4)  # micro-fades: no clicks at cut points
         fc.append(f"[{i}:a]aresample=48000,asetpts=PTS-STARTPTS,afade=t=in:d={fd:.3f},"
                   f"afade=t=out:st={seg['dur'] - fd:.4f}:d={fd:.3f}[aa{k}]")
