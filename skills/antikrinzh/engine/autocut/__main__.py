@@ -42,7 +42,7 @@ def _finish(job: Path, t0: float) -> dict:
     if args.get("deliver") or args.get("export"):
         from .nle import export_all
         name = args.get("name") or time.strftime("Рилс %d.%m %H-%M")
-        kinds = tuple(k.strip() for k in (args.get("export") or "").split(",") if k.strip()) or ("srt",)
+        kinds = tuple(k.strip() for k in (args.get("export") or "").split(",") if k.strip()) or ("capcut",)
         extra = export_all(spec_path, Path(args["deliver"]) if args.get("deliver") else job, name, video,
                            Path(args["capcut_root"]) if args.get("capcut_root") else None, args.get("map"), kinds)
     return {**extra, "video": extra.get("video") or str(Path(video).resolve()), "sec": round(s["duration"], 1),
@@ -98,7 +98,7 @@ def main() -> None:
     ex.add_argument("--deliver", type=Path, required=True)
     ex.add_argument("--name", required=True)
     ex.add_argument("--video", type=Path)
-    ex.add_argument("--export", default="capcut,fcpxml,srt")
+    ex.add_argument("--export", default="capcut")
     ex.add_argument("--capcut-root", type=Path)
     ex.add_argument("--map", nargs="*", default=[])
 
@@ -114,7 +114,7 @@ def main() -> None:
     au.add_argument("--all-talking", action="store_true", help="every video is a part of the talk, join them all")
     au.add_argument("--deliver", type=Path, help="folder for the results (the «Готовое» folder)")
     au.add_argument("--name", help="name of the reel / project (default: Рилс <date time>)")
-    au.add_argument("--export", default="", help="comma list: capcut,fcpxml,srt (editable projects)")
+    au.add_argument("--export", default="", help="capcut (editable project; fcpxml/srt still possible but not used by the skills)")
     au.add_argument("--capcut-root", type=Path, help="CapCut drafts folder …/com.lveditor.draft as seen here")
     au.add_argument("--map", nargs="*", default=[], help="THIS_SHELL_PATH=REAL_COMPUTER_PATH for paths inside projects")
     au.add_argument("--plan", action="store_true", help="storyboard only: print the plan, render later with `finish`")

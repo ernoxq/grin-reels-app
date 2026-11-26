@@ -32,14 +32,10 @@ Their text → use it, only split it into slides. No text → write it by the `s
 ```bash
 [ -d grin ] || cp -r <this skill's folder>/engine ./grin
 pip install --break-system-packages -q numpy Pillow
-cd grin && python -m autocut design ../slides.json --out ../design [--taste /abs/taste_x.json]
+cd grin && python -m autocut design ../slides.json --out ../design --no-capcut [--taste /abs/taste_x.json]
 ```
-Folder «Монтаж Claude» (see the montage skill): run on the computer with `device_bash` in `$HOME/grin`, `--out "$HOME/mnt/<folder>/Готовое"`, and if CapCut's folder is connected add `--capcut-root "$HOME/mnt/CapCut/User Data/Projects/com.lveditor.draft" --map "$HOME/mnt/<folder>=<real path>" --map "$HOME/mnt/CapCut=<real path>"`.
-It prints JSON: `slides` (PNGs), `sheet`, `warnings`, `capcut` or `capcut_folder`. Fix every warning (shorten the text, cut a list item) and run again. Look at `sheet` ONCE: nothing cut off, accents on the right words, slides not all alike. Fix in slides.json, re-run (1 s).
+It prints JSON: `slides` (PNGs), `sheet`, `warnings`. Fix every warning (shorten the text, cut a list item) and run again. Look at `sheet` ONCE: nothing cut off, accents on the right words, slides not all alike. Fix in slides.json, re-run (1 s).
+Edits are made here in the chat: change slides.json and re-run. A CapCut project only when the person asks for it AND their Mac folder is connected (CapCut needs real paths on their disk): run the same on the computer with `device_bash` in `$HOME/grin` (see the montage skill's reference.md I) without `--no-capcut`, with `--out "$HOME/mnt/<folder>/Готовое" --capcut-root "$HOME/mnt/CapCut/User Data/Projects/com.lveditor.draft" --map "$HOME/mnt/<folder>=<real path>" --map "$HOME/mnt/CapCut=<real path>"`. There every text is its own CapCut layer; restart CapCut to see it.
 
 ## 5. Deliver
-Send the PNGs with SendUserFile (folder mode: just say where). Then:
-- «Готово: N слайдов. Можно выкладывать как есть.»
-- CapCut: «Проект `<name>` в CapCut: каждый текст отдельным слоем, шрифт, цвет и слова меняются. Фон слайда отдельной картинкой. Перезапусти CapCut, чтобы он появился.» No CapCut folder connected → zip the `capcut_folder` and send it: «распакуй в папку проектов CapCut». Each slide is 3 s on the timeline. The PNGs are already final; CapCut is for edits.
-- One offer: «Поменять шрифт, цвет или текст на каком-то слайде?»
-Remind once: «Перепиши тексты своими словами, если звучит не как ты.»
+Send the PNGs with SendUserFile (folder mode: just say where). Then: «Готово: N слайдов, можно выкладывать». One offer: «Поменять шрифт, цвет или текст на каком-то слайде? Просто напиши». Remind once: «Перепиши тексты своими словами, если звучит не как ты.»

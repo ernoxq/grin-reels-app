@@ -18,7 +18,7 @@ You are the honest second pair of eyes, not a fan. No flattery, no «отлич�
 pip install --break-system-packages -q numpy Pillow faster-whisper "av<16"
 cd grin && python -m autocut review /abs/path/REEL.mp4 --out ../review
 ```
-Folder «Монтаж Claude» connected (see the montage skill): run the same on the computer with `device_bash` in `$HOME/grin`, take the reel from `Готовое/` or `Референсы/`.
+Folder «Монтаж Claude» connected (montage skill, reference.md I): run the same on the computer with `device_bash` in `$HOME/grin`, take the reel from `Готовое/` or `Референсы/`.
 It prints one JSON line (pace, cuts in the first 3 s, when speech starts, words/s, long pauses with times, dead air at the end, loudness, `flags`) and then the transcript by phrases `[time] text`. Look at `review/sheet.png` ONCE (dense frames of the first 3 s, then the rest). No speech model / no network → `--no-speech` and ask for the text.
 Text only (script, caption, carousel): skip this step.
 

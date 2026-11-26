@@ -11,7 +11,7 @@ The sponge soaks up what the creator likes so every next reel or carousel looks 
 
 Save the person's limits: the script measures pace, colour and music; you look at ONE small picture (8 key frames) once, and never at the reel itself. Reply in 2-3 lines.
 
-**Folder «Монтаж Claude»:** if the person's computer folder is connected (see the auto-edit skill, section 0), take the reference from `Референсы/` (the one they name, else the newest) and run the same commands there with `device_bash` in `$HOME/grin`; the style is saved in `$HOME/grin/styles/` (stays on the computer for every next chat); also copy the `.json` into `Вкус/`.
+**Folder «Монтаж Claude»:** if the person's computer folder is connected (montage skill, reference.md I), take the reference from `Референсы/` (the one they name, else the newest) and run the same commands there with `device_bash` in `$HOME/grin`; the style is saved in `$HOME/grin/styles/` (stays on the computer for every next chat); also copy the `.json` into `Вкус/`.
 
 **Colour is NOT copied by default** (another light easily turns skin green or grey). Add `--colour` only when the person asks for the colour/look of the reference; it is applied at 40 %. Then check one frame of the result: skin must look like skin.
 

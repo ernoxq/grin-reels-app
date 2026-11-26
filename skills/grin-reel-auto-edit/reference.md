@@ -89,3 +89,29 @@ Send `final.mp4`. Music is not bundled: set `music.asset` to a licensed file in 
 - **Title:** the first sentence in uppercase on 2 lines; line 2 uses the accent colour and blurs in.
 - **B-roll:** every other sentence gets an insert (never the title sentence or the last one); with few clips they are spread evenly over the whole video; one insert covers at most 4 s, then the face returns. A clause of 3 s or more becomes a beat montage cut every 2 beats, alternating colour and B&W. Clips shot at 60 fps play at 0.8×.
 - **Look:** zoom 1.105, frame shifted up, A-roll exposure normalised, then LUTs and the bottom shadow. The video ends with the CTA pop and a 0.53 s fade.
+
+## I. Folder mode: «Монтаж Claude» on the person's computer (CapCut project)
+If the session has `mcp__remote-devices__*` tools, call `get_device_info`. A connected folder with `Исходники` (or the folder they name) → work there, don't ask them to attach files:
+- `Исходники/` raw videos and photos (a subfolder per reel: take the one they name, else the newest files);
+- `Референсы/` reels/pictures whose style to copy (only if asked);
+- `Готовое/` results; `Вкус/` saved taste: `ref_*.json` (pass with `--style`), `taste_*.json`, `голос.md`. Create the four folders if empty.
+Run on the computer with `device_bash` (nothing is uploaded):
+```bash
+[ -d $HOME/grin ] || git clone -q --depth 1 https://github.com/ernoxq/grin-reels-app $HOME/grin; cd $HOME/grin && git pull -q
+F="$HOME/mnt/<folder>"; nohup bash run.sh "$F/Исходники/"* --plan --out $HOME/grin/jobs/r1 --deliver "$F/Готовое" --name "<short name>" \
+  --export capcut [--capcut-root "$HOME/mnt/CapCut/User Data/Projects/com.lveditor.draft"] \
+  --map "$HOME/mnt/<folder>=<real path of that folder>" ["$HOME/mnt/CapCut=<real path of CapCut folder>"] > $HOME/out.txt 2>&1 &
+```
+Real paths: `get_device_info.connectedFolders`. Poll `sleep 170; tail -25 $HOME/out.txt` (device_bash stops at 180 s; the job keeps running). Show the plan as in section 2, then `cd $HOME/grin && nohup python3 -m autocut finish jobs/r1 > $HOME/out.txt 2>&1 &`.
+- CapCut: ask once to connect `~/Movies/CapCut` (device_request_folder_access) and pass `--capcut-root`; the reel appears after CapCut is restarted (Cmd+Q, open). Without it the project is left in `Готовое/<name> - проект/CapCut/`: «скопируй эту папку в папку проектов CapCut».
+- Result: `Готовое/<name>.mp4` + the CapCut project. Say where in one line; don't send the video into the chat unless asked.
+- No `device_bash`, only file tools: stage the files, build in the cloud (section 2), write `final.mp4` back with `device_commit_files` (send it with SendUserFile first, commit by file_uuid). No CapCut project in this case.
+- On a Mac the engine needs `install.sh` once (ffmpeg + Python). If `run.sh` says ffmpeg is missing: «Один раз запусти install.sh из архива GRIN Reels».
+
+## J. Motion graphics and references by link
+Animated GRIN text, offer when a number, a name, a step or a key phrase deserves it:
+`python -m autocut place grin/jobs/r1/spec.json --motion KIND --text "..." --words "слова из речи" [--pos auto|top|center|bottom] [--accent "#E4F23C"]`
+`auto` finds the face and puts the graphic above the head or on the chest, never on the face. Show the list of texts with their words before rendering: you invent them, they approve.
+- `headline` big words pop in, `*phrase*` gets a marker; `plate` name plate, `--sub` small line; `number` counts up, `--label`; `step` numbered circle, `--n 02`; `checklist` `"п1|п2|п3"` with ticks.
+Each is its own clip in the CapCut project.
+Reference by link: `python -m autocut fetch URL --out refs`. Answer `network` or `login` → «Не могу скачать по ссылке - сохрани рилс и пришли файл».
