@@ -10,8 +10,8 @@ then: python -m autocut render jobs/r1/spec.json --out jobs/r1/final.mp4
 --font      Montserrat Medium|SemiBold|Bold|Black, Inter Medium|SemiBold|Bold|Black, Oswald
 --upper / --no-upper   --color "#FFFFFF"   --highlight "#F6DB92" (words mode)
 --anim      rise | pop | fade
---frame     fill (crop to vertical, default) | fit (whole horizontal frame on black, captions under it) |
-            blur (whole frame over its own blurred copy)
+--frame     fill (crop to vertical) | fit (whole horizontal frame on black, captions under it; default for
+            horizontal video) | blur (whole frame over its own blurred copy; only if asked)
 --music     file.mp3 [--music-db -20]: background track, looped, faded; -16 audible, -20 quiet («тихонько»), -24 barely
 --punch     1.0 off, 1.06 subtle, 1.10 strong: every other cut is a bit closer (classic talking-head rhythm)
 """
@@ -90,7 +90,8 @@ def look(spec_path: str, captions=None, size=None, y=None, font=None, upper=None
 
 
 def auto_frame(spec_path) -> str | None:
-    """Horizontal talking video: show the whole frame (blur) instead of cropping the head off."""
+    """Horizontal talking video: show the whole frame on black (clean, like most creators do) instead of
+    cropping the head off. Blur only when the person asks for it."""
     import subprocess
     from .reel import _p
     sp = Path(spec_path)
@@ -106,6 +107,6 @@ def auto_frame(spec_path) -> str | None:
     if abs(int(float(vals.get("rotation", 0) or 0))) in (90, 270):
         w, h = h, w
     if w > h * 1.1:
-        look(str(sp), frame="blur")
-        return "blur"
+        look(str(sp), frame="fit")
+        return "fit"
     return None
