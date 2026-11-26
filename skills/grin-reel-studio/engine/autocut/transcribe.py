@@ -46,7 +46,16 @@ def transcribe(path: str, cache: Path, model_size: str = "small", language: str 
     words: list[Word] = []
     for seg in segments:  # generator: segments are decoded lazily, memory stays flat
         for w in seg.words or []:
-            words.append(Word(w.word.strip(), float(w.start), float(w.end), float(w.probability)))
+            txt = w.word.strip()
+            if not txt:
+                continue
+            # Whisper marks a new word with a leading space; a piece without it (or a lone
+            # punctuation mark) continues the previous word: «СММ»+«щику» -> «СММщику»
+            if words and (not w.word.startswith(" ") or not any(ch.isalnum() for ch in txt)):
+                p0 = words[-1]
+                words[-1] = Word(p0.text + txt, p0.start, float(w.end), min(p0.prob, float(w.probability)))
+                continue
+            words.append(Word(txt, float(w.start), float(w.end), float(w.probability)))
     del model
     cache.with_name("lang.txt").write_text(info.language or "")
     cache.write_text(json.dumps([asdict(w) for w in words], ensure_ascii=False))
