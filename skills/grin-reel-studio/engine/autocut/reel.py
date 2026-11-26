@@ -269,8 +269,12 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
     cx = int((sw - W) / 2 - ax * W / 2)
     cy = int((sh - H) / 2 + ay * H / 2)
     vlabels, alabels = [], []
+    from .audioclean import clean
+    vsrc = {}  # talking clips with cleaned voice (denoise + -14 LUFS), cached in the job folder
+    for key in {seg["src"] for seg in spec["voice"]}:
+        vsrc[key] = _src(spec, key) if spec.get("raw_audio") else clean(_src(spec, key), Path(spec["_base"]) / "clean")
     for k, seg in enumerate(spec["voice"]):
-        i = add_input(_src(spec, seg["src"]), seg["in"], seg["dur"])
+        i = add_input(vsrc[seg["src"]], seg["in"], seg["dur"])
         fc.append(f"[{i}:v]fps={FPS},scale={sw}:{sh}:force_original_aspect_ratio=increase:flags=lanczos,"
                   f"crop={sw}:{sh},crop={W}:{H}:{cx}:{cy},setsar=1"
                   f"{_gain(look.get('gain'))}{wb_filter(look.get('wb_gain'))}{lut(look.get('lut'), look.get('lut_mix'))}{adjust_filters(look.get('adjust'))}"
