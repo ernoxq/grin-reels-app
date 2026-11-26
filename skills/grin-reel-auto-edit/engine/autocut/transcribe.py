@@ -34,15 +34,36 @@ def _pcm(path: str):
     return np.frombuffer(raw, np.int16).astype(np.float32) / 32768
 
 
-def transcribe(path: str, cache: Path, model_size: str = "small", language: str | None = None) -> list[Word]:
+# A short, clean sentence in the spoken language makes Whisper write punctuation, capitals and ё
+# (caption phrasing and scenes break at sentence ends). Names/brands go after it as a vocabulary.
+PRIMER = {
+    "ru": "Ну что, привет. Сегодня расскажу, как я это делаю: просто, быстро и без лишнего.",
+    "uk": "Ну що, привіт. Сьогодні розповім, як я це роблю: просто, швидко і без зайвого.",
+    "ro": "Salut! Astăzi vă arăt cum fac asta: simplu, rapid și fără nimic în plus.",
+    "en": "Hi! Today I'll show you how I do it: simple, fast, and nothing extra.",
+    "de": "Hallo! Heute zeige ich euch, wie ich das mache: einfach, schnell und ohne Umwege.",
+}
+
+
+def transcribe(path: str, cache: Path, model_size: str = "small", language: str | None = None,
+               vocab: str | None = None) -> list[Word]:
     if cache.exists():
         return [Word(**w) for w in json.loads(cache.read_text())]
 
     from faster_whisper import WhisperModel  # imported lazily: not needed for silence-only runs
 
     model = WhisperModel(model_size, device="cpu", compute_type="int8", cpu_threads=os.cpu_count() or 4)
-    segments, info = model.transcribe(_pcm(path), language=language, word_timestamps=True,
-                                       vad_filter=True, beam_size=1)
+    audio = _pcm(path)
+    if not language:  # know the language first, so the primer is in the right one
+        try:
+            language = model.detect_language(audio)[0]
+        except Exception:
+            language = None
+    vf = cache.with_name("vocab.txt")
+    vocab = vocab or (vf.read_text().strip() if vf.exists() else "")
+    prompt = " ".join(x for x in (PRIMER.get(language or "", ""), vocab) if x) or None
+    segments, info = model.transcribe(audio, language=language, word_timestamps=True, vad_filter=True,
+                                      beam_size=5, initial_prompt=prompt)
     words: list[Word] = []
     for seg in segments:  # generator: segments are decoded lazily, memory stays flat
         for w in seg.words or []:

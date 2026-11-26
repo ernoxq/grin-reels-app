@@ -28,7 +28,8 @@ Otherwise (files attached to the chat):
 nohup bash grin/run.sh <ALL attached videos and photos, absolute paths> --plan --out grin/jobs/r1 [options] > grin/out.txt 2>&1 &
 ```
 Wait cheaply: `sleep 120; tail -25 grin/out.txt` until the plan appears (~1.5 min per minute of raw video).
-Fix obvious recognition mistakes yourself with `--fix "wrong=right"` (one or several words; you know the language) and drop clear stumbles/repeats with `--drop`, re-plan once. Show the plan as it is and ask: «Собираю так или что-то поменять?». Apply, re-plan (fast, no new recognition):
+**Captions must be CapCut-level or better: proofread every plan before showing it.** Read the whole text once like an editor: misheard words («к Лоду»→«Клоду», «клад»→«Клод», «Терраспалета не обойдет с стороной»→«Тирасполь это не обойдёт стороной»), names and brands, case endings, numbers. Fix ALL of them in one `--fix "wrong=right" ...` re-plan (several words → any number of words, timing is kept); you know the language and the meaning, Whisper doesn't. Never paraphrase what they said, only what was misheard. Drop clear stumbles/repeats with `--drop`.
+First run: pass `--vocab "names, brands, terms"` you already know (their name, brand, city, Claude/CapCut...; folder mode: the contents of `Вкус/словарь.txt` if it exists). When they correct a word, offer once to add it to `Вкус/словарь.txt`.
 - `--drop "фраза"` (undo `--keep`), `--title "..."`; same `--out` remembers earlier choices; a new reel gets a new `--out`.
 - photo / video / icon on certain words: `place` (reference.md E); animated text: reference.md J.
 Render: `cd grin && nohup python -m autocut finish jobs/r1 > out.txt 2>&1 &`, poll, read the JSON line.

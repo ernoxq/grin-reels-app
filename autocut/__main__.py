@@ -122,6 +122,7 @@ def main() -> None:
     au.add_argument("--keep", nargs="*", default=[], help="undo an earlier --drop")
     au.add_argument("--fix", nargs="*", default=[], help='wrongly recognised words: "wrong=right" (kept between re-plans)')
     au.add_argument("--no-inserts", action="store_true", help="talking parts only, no B-roll")
+    au.add_argument("--vocab", help='names/brands/terms the speaker uses, comma-separated ("Claude, Кишинёв, Мария")')
 
     rd = sub.add_parser("render", help="render a reel spec.json (after hand edits)")
     rd.add_argument("spec", type=Path)
@@ -258,6 +259,10 @@ def main() -> None:
                 (a.out / f).unlink(missing_ok=True)  # other files than last time: start this job fresh
         from .prep import join_audio, split_voice
         audio, parts = join_audio(srt["story"], a.out / "story.wav")  # sound only: seconds, not minutes
+        if a.vocab:  # new vocabulary = recognise again with it
+            vf = a.out / "vocab.txt"
+            if not vf.exists() or vf.read_text().strip() != a.vocab.strip():
+                vf.write_text(a.vocab.strip()); (a.out / "words.json").unlink(missing_ok=True)
         if not (a.out / "words.json").exists():
             from .transcribe import transcribe
             transcribe(str(audio), a.out / "words.json", str(fetch_model_path(a.model)), a.lang)
