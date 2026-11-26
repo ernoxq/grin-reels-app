@@ -34,7 +34,7 @@ Their text → use it, only split it into slides. No text → write it by the `s
 
 ## 4. Build
 ```bash
-[ -d grin ] || cp -r <this skill's folder>/engine ./grin
+[ -d grin ] || { mkdir -p grin && tar xzf <this skill's folder>/engine.tar.gz -C grin; }
 pip install --break-system-packages -q numpy Pillow fonttools
 cd grin && python -m autocut design ../slides.json --out ../design [--taste /abs/taste_x.json] [--canvas <canvas folder>]
 ```

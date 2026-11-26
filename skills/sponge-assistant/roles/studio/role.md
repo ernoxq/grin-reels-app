@@ -3,11 +3,11 @@
 
 # GRIN Reels - Studio template
 
-The engine (`engine/`, same as grin-reel-auto-edit plus `autocut/studio.py`) cuts the talk, cuts the person out (Robust Video Matting), draws the cards from a `scenes.json` you write, and renders. Reply in Russian, short.
+The engine (`engine.tar.gz`, same as grin-reel-auto-edit plus `autocut/studio.py`) cuts the talk, cuts the person out (Robust Video Matting), draws the cards from a `scenes.json` you write, and renders. Reply in Russian, short.
 
 ## 1. Setup and the talk (same as auto-edit)
 ```bash
-[ -d grin ] || cp -r <this skill's folder>/engine ./grin
+[ -d grin ] || { mkdir -p grin && tar xzf <this skill's folder>/engine.tar.gz -C grin; }
 pip install --break-system-packages -q numpy Pillow fonttools faster-whisper "av<16" opencv-python-headless resvg-py onnxruntime pycapcut
 nohup bash grin/run.sh <talking video(s)> --all-talking --plan --out grin/jobs/s1 > grin/out.txt 2>&1 &
 ```

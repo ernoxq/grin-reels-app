@@ -55,9 +55,18 @@ cp -r --update=none $D/library/fonts/* $G/engine/library/fonts/; rm -rf $D
 
 cd $S
 rm -f ./*.zip
+# claude.ai allows max 200 files per uploaded zip: the engine travels as ONE engine.tar.gz inside the skill
+T=$(mktemp -d)
 for d in sponge-assistant grin-reel-auto-edit grin-reel-studio gubka-learn dizainer antikrinzh scenarist-hook-doctor; do
-  zip -qr "$d.zip" "$d" -x '*.DS_Store' -x '*/__pycache__/*'
+  rm -rf "$T/$d"; cp -r "$d" "$T/$d"
+  if [ -d "$T/$d/engine" ]; then
+    tar -C "$T/$d/engine" --exclude='__pycache__' --exclude='.DS_Store' -czf "$T/$d/engine.tar.gz" .
+    rm -rf "$T/$d/engine"
+  fi
+  (cd "$T" && zip -qr "$OLDPWD/$d.zip" "$d" -x '*.DS_Store' -x '*/__pycache__/*')
+  n=$(unzip -Z1 "$d.zip" | wc -l); [ "$n" -le 200 ] || { echo "TOO MANY FILES ($n): $d.zip"; exit 1; }
 done
+rm -rf "$T"
 for d in */SKILL.md _sponge-assistant/SKILL.md; do  # claude.ai rejects descriptions over 200 characters
   n=$(grep -m1 '^description:' "$d" | sed 's/^description: //' | python3 -c 'import sys; print(len(sys.stdin.read().strip()))')
   [ "$n" -le 200 ] || { echo "TOO LONG ($n): $d"; exit 1; }
