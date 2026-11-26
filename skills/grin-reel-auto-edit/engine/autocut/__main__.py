@@ -156,6 +156,9 @@ def main() -> None:
     so.add_argument("--capcut", help="also write a layered CapCut project with this name")
     so.add_argument("--capcut-root"); so.add_argument("--media-dir"); so.add_argument("--map", nargs="*", default=[])
     sub.add_parser("studio-help", help="scene types for scenes.json")
+    sc = sub.add_parser("scene", help="speaker shrinks into a card / half screen, words typeset around (scenes.py)")
+    sc.add_argument("spec"); sc.add_argument("kind", choices=["card", "split", "clear"])
+    sc.add_argument("--from", dest="frm"); sc.add_argument("--to"); sc.add_argument("--key"); sc.add_argument("--list")
     pl = sub.add_parser("place", help="put a photo/video/icon on top at the given words, then re-render")
     pl.add_argument("spec"); pl.add_argument("file", nargs="?")
     pl.add_argument("--words"); pl.add_argument("--at", type=float); pl.add_argument("--dur", type=float)
@@ -343,6 +346,9 @@ def main() -> None:
             r.update(capcut(job, Path(a.scenes), a.capcut, root, Path(a.media_dir) if a.media_dir else job / "studio" / "capcut_media",
                             Path(a.video) if a.video else None, a.map))
         print(r["plan"] if a.plan else json.dumps(r, ensure_ascii=False))
+    elif a.cmd == "scene":
+        from .scenes import scene
+        print(json.dumps(scene(a.spec, a.kind, a.frm, a.to, a.key, a.list), ensure_ascii=False))
     elif a.cmd == "place":
         from .place import place
         if a.motion:

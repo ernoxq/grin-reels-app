@@ -42,6 +42,14 @@ No LUT or «cinematic look» unless asked. Asked for a look: one preset at 40-70
 
 ## 4. Any other wish
 Content (what stays, order, words, title) → plan flags. Something on screen at certain words → `place`. Fonts, colours, music, captions → reference.md D. Their vibe from 1-5 reels → `gubka-learn`. Studio format → `grin-reel-studio`. Link to a reference → reference.md J. Anything else → one small ffmpeg step on `final.mp4`.
+
+**Designer scenes (default for talking-head reels over 20 s, unless they say «просто»):** from the plan, pick 2–3 moments: a strong claim → `card`, an enumeration → `split`. Never in the first 1.5 s; ~1 scene per 10 s; key = 2–4 words that carry the meaning.
+```bash
+python -m autocut scene jobs/r1/spec.json card --from "первые слова" [--to "последние слова"] --key "ключевая фраза|ещё слово"
+python -m autocut scene jobs/r1/spec.json split --from "первые слова" --list "пункт 1|пункт 2|пункт 3"
+python -m autocut render jobs/r1/spec.json --out jobs/r1/final.mp4
+```
+Colours: `scene_style` in spec (`bg`, `ink`, `key`, `key_edge`), e.g. from their taste. Scenes are in the MP4 only; the CapCut project keeps the plain cut (say so in one line if they edit in CapCut). Undo: `scene ... clear`.
 Safe zone: captions and graphics stay in y 270–1495 of 1920; warn before moving them lower.
 
 ## 5. Deliver

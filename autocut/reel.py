@@ -106,6 +106,10 @@ def write_ass(spec: dict, out: Path) -> Path:
             f"&H00000000,&H80000000,-1,0,0,0,{ts.get('scale_x', 100)},{ts.get('scale_y', 100)},0,0,1,0,"
             f"{ts.get('shadow', 2)},5,40,40,0,1")
     ev = []
+    if spec.get("scenes"):
+        from .scenes import ass_events, ass_styles, in_scene
+        styles += ass_styles(spec, H)
+        ev += ass_events(spec, W, H)
     # ---- safe zone + face: one level for all captions, one for the title
     from .safezone import DEFAULT, scaled, face_box, place_block, right_edge
     z = scaled(spec.get("safe_zone") or DEFAULT, W, H)
@@ -147,6 +151,8 @@ def write_ass(spec: dict, out: Path) -> Path:
     fade = int(cs.get("fade_ms", 80))
     gap = cs.get("line_gap", int(cs["size"] * 0.7))
     caps = spec.get("captions", [])
+    if spec.get("scenes"):  # the scene typesets the words itself
+        caps = [c for c in caps if not in_scene(spec, (c["start"] + c["end"]) / 2)]
     nmax = max((len(c["text"].split("\n")) for c in caps), default=1)
     cap_c = place_block(yc(cs["y"]), gap * (nmax - 1) + cs["size"], z, face)
     up = (lambda x: x.upper()) if cs.get("uppercase") else (lambda x: x)
@@ -289,6 +295,9 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
 
     # B-roll inserts (video only; voice keeps running underneath = J/L cuts)
     last, bl = "base", spec.get("broll_look", {})
+    if spec.get("scenes"):  # card / split scenes (scenes.py)
+        from .scenes import video_filters
+        last = video_filters(spec, fc, last, W, H, FPS)
     for k, b in enumerate(spec.get("broll", [])):
         sp = b.get("speed", 1.0)
         if b.get("image"):  # photo: gentle push-in (Ken Burns), same grade as video B-roll
@@ -315,7 +324,9 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
     if sh := spec.get("shadow"):
         i = add_raw("-loop", "1", "-framerate", str(FPS), "-t", f"{dur:.3f}", "-i", _p(spec, sh))
         fc.append(f"[{i}:v]format=rgba,scale={W}:{H}[shd]")
-        fc.append(f"[{last}][shd]overlay=0:0:format=auto:shortest=1[vsh]")
+        off = "+".join(f"between(t,{x['start']:.3f},{x['end']:.3f})" for x in spec.get("scenes") or [])
+        en = f":enable='not({off})'" if off else ""  # no dark gradient over the light scene background
+        fc.append(f"[{last}][shd]overlay=0:0:format=auto:shortest=1{en}[vsh]")
         last = "vsh"
 
     # captions + title
