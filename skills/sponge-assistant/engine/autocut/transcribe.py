@@ -20,6 +20,7 @@ class Word:
     start: float
     end: float
     prob: float = 1.0
+    cut: bool = False  # a word was trimmed right before this one: the voice must be cut here
 
 
 def _pcm(path: str):

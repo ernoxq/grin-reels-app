@@ -13,6 +13,7 @@ then: python -m autocut render jobs/r1/spec.json --out jobs/r1/final.mp4
 --frame     fill (crop to vertical) | fit (whole horizontal frame on black, captions under it; default for
             horizontal video) | blur (whole frame over its own blurred copy; only if asked)
 --music     file.mp3 [--music-db -20]: background track, looped, faded; -16 audible, -20 quiet («тихонько»), -24 barely
+--speed     1.1: whole reel 10% faster, pitch stays (most creators do this); 1.0 off
 --punch     1.0 off, 1.06 subtle, 1.10 strong: every other cut is a bit closer (classic talking-head rhythm)
 """
 from __future__ import annotations
@@ -40,7 +41,7 @@ PRESETS = {
 
 
 def look(spec_path: str, captions=None, size=None, y=None, font=None, upper=None, color=None,
-         highlight=None, anim=None, punch=None, frame=None, music=None, music_db=None) -> dict:
+         highlight=None, anim=None, punch=None, frame=None, music=None, music_db=None, speed=None) -> dict:
     sp = Path(spec_path)
     spec = json.loads(sp.read_text())
     cs = spec["caption_style"]
@@ -79,6 +80,8 @@ def look(spec_path: str, captions=None, size=None, y=None, font=None, upper=None
             bottom = (H - fh) * FRAME_TOP + fh
             cs["y"] = round(max(-0.6, 1 - 2 * (bottom + 0.07 * H) / H), 3)
             spec["avoid_face"] = False
+    if speed is not None:
+        spec["speed"] = max(0.8, min(1.3, speed))
     if music:
         spec["music"] = {"asset": str(Path(music).resolve()), "gain_db": music_db if music_db is not None else -20}
     elif music_db is not None and spec.get("music"):
@@ -86,7 +89,7 @@ def look(spec_path: str, captions=None, size=None, y=None, font=None, upper=None
     sp.write_text(json.dumps(spec, ensure_ascii=False, indent=1))
     return {"captions": {k: cs.get(k) for k in ("font_name", "size", "y", "uppercase", "anim", "mode")},
             "punch": spec.get("aroll_look", {}).get("punch", 1.0), "frame": spec.get("aroll_look", {}).get("frame", "fill"),
-            "music": spec.get("music")}
+            "music": spec.get("music"), "speed": spec.get("speed", 1.0)}
 
 
 def auto_frame(spec_path) -> str | None:

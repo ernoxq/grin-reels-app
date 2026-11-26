@@ -122,6 +122,9 @@ def main() -> None:
     au.add_argument("--keep", nargs="*", default=[], help="undo an earlier --drop")
     au.add_argument("--fix", nargs="*", default=[], help='wrongly recognised words: "wrong=right" (kept between re-plans)')
     au.add_argument("--no-inserts", action="store_true", help="talking parts only, no B-roll")
+    au.add_argument("--trim", nargs="*", default=[], help='cut single words in place: "[Но] пока что", "вот [этот] весь" (kept between re-plans)')
+    au.add_argument("--untrim", nargs="*", default=[], help="undo an earlier --trim (same text)")
+    au.add_argument("--target", type=float, help="wanted length in seconds: the plan says how much to cut")
     au.add_argument("--vocab", help='names/brands/terms the speaker uses, comma-separated ("Claude, Кишинёв, Мария")')
 
     rd = sub.add_parser("render", help="render a reel spec.json (after hand edits)")
@@ -165,6 +168,7 @@ def main() -> None:
     lk.add_argument("--color"); lk.add_argument("--highlight"); lk.add_argument("--anim", choices=["rise", "pop", "fade"])
     lk.add_argument("--punch", type=float)
     lk.add_argument("--frame", choices=["fill", "fit", "blur"]); lk.add_argument("--music"); lk.add_argument("--music-db", type=float)
+    lk.add_argument("--speed", type=float)
     sc = sub.add_parser("scene", help="speaker shrinks into a card / half screen, words typeset around (scenes.py)")
     sc.add_argument("spec"); sc.add_argument("kind", choices=["card", "split", "clear"])
     sc.add_argument("--from", dest="frm"); sc.add_argument("--to"); sc.add_argument("--key"); sc.add_argument("--list")
@@ -299,11 +303,14 @@ def main() -> None:
         args["drop"] = drops
         fixes = [f for f in prev.get("fix", []) if f.split("=")[0] not in {x.split("=")[0] for x in a.fix}] + a.fix
         args["fix"] = fixes
-        if drops or fixes:
+        trims = [t for t in prev.get("trim", []) if t not in a.untrim] + [t for t in a.trim if t not in prev.get("trim", [])]
+        args["trim"] = trims
+        args["target"] = a.target or prev.get("target")
+        if drops or fixes or trims:
             a.drop = drops
-            from .storyboard import drop_phrases, fix_words
+            from .storyboard import drop_phrases, fix_words, trim_words
             w = json.loads((a.out / "words.json").read_text())
-            (a.out / "words_edit.json").write_text(json.dumps(drop_phrases(fix_words(w, fixes), a.drop),
+            (a.out / "words_edit.json").write_text(json.dumps(drop_phrases(trim_words(fix_words(w, fixes), trims), a.drop),
                                                               ensure_ascii=False))
             spec_path = run(str(main), args["inserts"], args["style"], str(a.out), script=args["script"],
                             title=a.title, words_json=str(a.out / "words_edit.json"), language=a.lang)
@@ -315,7 +322,7 @@ def main() -> None:
             from .storyboard import plan_text
             txt = plan_text(a.out)
             (a.out / "plan.txt").write_text(txt)
-            print(txt + f"\nJOB: {a.out}")
+            print(txt + f"\nJOB: {a.out}\nSPEC: {a.out / 'spec.json'}")
             return
         print(json.dumps(_finish(a.out, t0), ensure_ascii=False))
     elif a.cmd == "fetch":
@@ -364,7 +371,7 @@ def main() -> None:
     elif a.cmd == "look":
         from .look import look
         print(json.dumps(look(a.spec, a.captions, a.size, a.y, a.font, a.upper, a.color, a.highlight, a.anim,
-                              a.punch, a.frame, a.music, a.music_db), ensure_ascii=False))
+                              a.punch, a.frame, a.music, a.music_db, a.speed), ensure_ascii=False))
     elif a.cmd == "scene":
         from .scenes import scene
         print(json.dumps(scene(a.spec, a.kind, a.frm, a.to, a.key, a.list), ensure_ascii=False))

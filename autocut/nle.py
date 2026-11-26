@@ -84,6 +84,20 @@ def build_timeline(spec_path: Path) -> dict:
     sticker = None
     if st.get("asset"):
         sticker = {"file": str(app_root() / "library" / st["asset"]), "start": st["start"], "end": st["end"]}
+    spd = float(spec.get("speed") or 1.0)
+    if spd != 1.0:  # same ×speed as the MP4: CapCut segment speed, every timeline time /spd
+        t = 0.0
+        for m in main:
+            m["speed"] = spd; m["start"] = round(t, 4); m["dur"] = round(m["dur"] / spd, 4); t += m["dur"]
+        for o in over:
+            o["start"] = round(o["start"] / spd, 4); o["dur"] = round(o["dur"] / spd, 4)
+            o["speed"] = o.get("speed", 1.0) * spd
+        for c in caps:
+            c["start"] = round(c["start"] / spd, 4); c["end"] = round(c["end"] / spd, 4)
+        if st.get("asset") and sticker:
+            sticker["start"] = round(sticker["start"] / spd, 4); sticker["end"] = round(sticker["end"] / spd, 4)
+        title = dict(title, start=title.get("start", 0) / spd, end=title.get("end", 0) / spd) if title else title
+        spec = dict(spec, duration=spec["duration"] / spd)
     return {"duration": spec["duration"], "main": main, "over": over, "captions": caps,
             "title": {"text": "\n".join(title.get("lines", [])), "start": title.get("start", 0),
                       "end": title.get("end", 0)} if title.get("lines") else None,
