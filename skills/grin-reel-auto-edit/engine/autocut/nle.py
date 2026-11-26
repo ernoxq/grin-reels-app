@@ -42,6 +42,10 @@ def _probe(p: str) -> dict:
 def build_timeline(spec_path: Path) -> dict:
     spec = json.loads(Path(spec_path).read_text())
     job = Path(spec_path).parent
+    if not spec.get("raw_cuts"):  # same pause-snapped cuts as the MP4 render
+        from .cutsafe import snap_voice
+        snap_voice(spec, lambda k: str(Path(spec["sources"][k]) if Path(spec["sources"][k]).is_absolute()
+                                       else job / spec["sources"][k]))
     parts_f = job / "story_parts.json"
     parts = json.loads(parts_f.read_text()) if parts_f.exists() else [
         {"file": spec["sources"]["A"], "start": 0.0, "dur": 1e9}]
@@ -347,6 +351,12 @@ def export_all(spec_path: Path, deliver: Path, name: str, video: Path | None = N
         tl["sticker"]["file"] = keep(tl["sticker"]["file"])
     for o in tl["over"]:
         o["file"] = keep(o["file"])
+    if not spec.get("raw_audio"):  # talking clips: cleaned voice copies, so CapCut sounds like the MP4
+        from .audioclean import clean
+        done = {}
+        for m in tl["main"]:
+            src = m["file"] if Path(m["file"]).is_absolute() else str(Path(spec_path).resolve().parent / m["file"])
+            m["file"] = done.setdefault(src, clean(src, assets))
     fonts = {}
     for f in spec.get("fonts", []):
         src = app_root() / "library" / f

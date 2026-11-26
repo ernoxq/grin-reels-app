@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>__TITLE__ - редактор</title>
+<!-- Губка Спанч / GRIN — © 2026 Ernest Grin (GRIN studio). Licensed to the buyer for personal use. -->
+<style>
+/*FONTS*/
+:root{--bg:#f4f3f0;--panel:#fff;--ink:#1a1a19;--mute:#8a8780;--line:#e4e2dc;--acc:#e8462f}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%;background:var(--bg);color:var(--ink);font:13px/1.4 -apple-system,BlinkMacSystemFont,"Segoe UI",Inter,sans-serif}
+#app{display:grid;grid-template-columns:96px 1fr 260px;grid-template-rows:48px 1fr;height:100vh}
+header{grid-column:1/-1;display:flex;align-items:center;gap:6px;padding:0 10px;border-bottom:1px solid var(--line);background:var(--panel)}
+header b{margin-right:auto;font-size:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+button{font:inherit;border:1px solid var(--line);background:#fff;border-radius:8px;padding:6px 10px;cursor:pointer;white-space:nowrap}
+button:hover{border-color:#bbb}button.main{background:var(--ink);color:#fff;border-color:var(--ink)}
+#thumbs{overflow:auto;padding:8px;border-right:1px solid var(--line);display:flex;flex-direction:column;gap:8px}
+#thumbs img{width:100%;border-radius:4px;border:2px solid transparent;cursor:pointer;display:block}
+#thumbs img.on{border-color:var(--acc)}
+#wrap{position:relative;overflow:hidden;display:flex;align-items:center;justify-content:center}
+#holder{position:relative;box-shadow:0 4px 24px rgba(0,0,0,.12)}
+#slide{position:absolute;left:0;top:0;transform-origin:0 0;overflow:hidden}
+#slide>img{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;user-select:none}
+.layer{position:absolute;white-space:pre-wrap;overflow-wrap:break-word;cursor:move;user-select:none;outline:0}
+.layer:hover{box-shadow:0 0 0 2px rgba(232,70,47,.35)}
+.layer.sel{box-shadow:0 0 0 3px var(--acc)}
+.handle{position:absolute;right:-14px;top:50%;width:22px;height:44px;margin-top:-22px;background:var(--acc);border-radius:6px;cursor:ew-resize;display:none}
+.layer.sel .handle{display:block}
+#guide{position:absolute;top:0;bottom:0;width:2px;background:#2b8cff;display:none;pointer-events:none}
+#panel{overflow:auto;padding:12px;border-left:1px solid var(--line);background:var(--panel)}
+#panel h4{margin:14px 0 6px;font-size:11px;text-transform:uppercase;letter-spacing:.06em;color:var(--mute)}
+#panel h4:first-child{margin-top:0}
+label{display:block;margin:8px 0 3px;color:var(--mute);font-size:12px}
+textarea,select,input[type=number]{width:100%;font:inherit;border:1px solid var(--line);border-radius:8px;padding:6px}
+textarea{min-height:90px;resize:vertical}
+.row{display:flex;gap:6px;align-items:center}.row>*{flex:1}
+input[type=color]{width:100%;height:32px;border:1px solid var(--line);border-radius:8px;padding:2px;background:#fff}
+input[type=range]{width:100%}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;flex:1}.seg button.on{background:var(--ink);color:#fff}
+.hint{color:var(--mute);font-size:11px;margin-top:4px}
+#modal{position:fixed;inset:0;background:rgba(0,0,0,.6);display:none;align-items:center;justify-content:center;flex-direction:column;gap:10px;z-index:9;color:#fff;padding:20px;text-align:center}
+#modal img{max-width:90vw;max-height:75vh;background:#fff}
+@media (max-width:820px){
+ #app{grid-template-columns:1fr;grid-template-rows:auto auto 1fr auto}
+ header{flex-wrap:wrap;padding:6px}
+ #thumbs{flex-direction:row;border-right:0;border-bottom:1px solid var(--line);height:96px}
+ #thumbs img{width:auto;height:100%}
+ #wrap{min-height:55vh}
+ #panel{border-left:0;border-top:1px solid var(--line)}
+}
+</style>
+</head>
+<body>
+<div id="app">
+ <header>
+  <b>__TITLE__</b>
+  <button id="undo" title="Cmd+Z">↶ Отменить</button>
+  <button id="add">+ Текст</button>
+  <button id="del">Удалить</button>
+  <button id="one" class="main">Скачать слайд</button>
+  <button id="all">Скачать все</button>
+ </header>
+ <aside id="thumbs"></aside>
+ <section id="wrap"><div id="holder"><div id="slide"><img id="ov" alt=""><div id="guide"></div></div></div></section>
+ <aside id="panel"></aside>
+</div>
+<div id="modal"><img id="mimg" alt=""><div>Если файл не скачался: правый клик по картинке → Save Image As (на телефоне: долгое нажатие).</div><button id="mclose">Закрыть</button></div>
+<script>
+const DATA=/*DATA*/null, FAMILIES=/*FAMILIES*/[];
+const W=DATA.W,H=DATA.H,KEY="gubka:"+DATA.name+":"+DATA.slides.length;
+const IMGS=DATA.slides.map(s=>{const i=new Image();i.src=s.img;return i});
+const ORIG=JSON.stringify(DATA.slides.map(s=>({bg:s.bg,layers:s.layers})));
+let S=JSON.parse(ORIG);
+try{const v=localStorage.getItem(KEY);if(v)S=JSON.parse(v)}catch(e){}
+let cur=0,sel=-1,hist=[],scale=1;
+const $=id=>document.getElementById(id), slide=$("slide");
+
+function esc(t){return t.replace(/&/g,"&amp;").replace(/</g,"&lt;")}
+function runs(t){const out=[];let acc=false;for(const p of t.split(/(\*)/)){if(p==="*"){acc=!acc;continue}if(p)out.push([p,acc])}return out}
+function html(L){return runs(L.t).map(([p,a])=>a?`<span style="color:${L.a}">${esc(p)}</span>`:esc(p)).join("")}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(S))}catch(e){}}
+function push(){hist.push(JSON.stringify(S));if(hist.length>80)hist.shift()}
+function changed(thumbAll){save();draw();thumb(thumbAll?null:cur)}
+
+function fit(){const r=$("wrap").getBoundingClientRect();scale=Math.min((r.width-24)/W,(r.height-24)/H);
+ $("holder").style.width=W*scale+"px";$("holder").style.height=H*scale+"px";slide.style.width=W+"px";slide.style.height=H+"px";slide.style.transform=`scale(${scale})`}
+
+function draw(){
+ const s=S[cur];slide.style.background=s.bg;$("ov").src=DATA.slides[cur].img;
+ slide.querySelectorAll(".layer").forEach(e=>e.remove());
+ s.layers.forEach((L,i)=>{const d=document.createElement("div");d.className="layer"+(i===sel?" sel":"");
+  Object.assign(d.style,{left:L.x+"px",top:L.y+"px",width:L.w+"px",fontFamily:`"${L.f}"`,fontSize:L.px+"px",lineHeight:L.lh,color:L.c,textAlign:L.al});
+  d.innerHTML=html(L)+'<div class="handle"></div>';d.dataset.i=i;slide.appendChild(d)});
+ panel();
+}
+
+function panel(){
+ const p=$("panel"),s=S[cur];
+ if(sel<0){p.innerHTML=`<h4>Слайд ${cur+1}</h4><label>Цвет фона</label><input type="color" id="pbg" value="${s.bg}">
+  <div class="hint">Нажми на текст на слайде, чтобы его менять. Тяни мышкой, чтобы двигать, а красный край — чтобы менять ширину.</div>
+  <h4>Слайд</h4><button id="reset">Вернуть слайд как было</button>`;
+  $("pbg").oninput=e=>{s.bg=e.target.value;slide.style.background=s.bg;save();thumb(cur)};$("pbg").onchange=()=>push();
+  $("reset").onclick=()=>{push();S[cur]=JSON.parse(ORIG)[cur];sel=-1;changed()};return}
+ const L=s.layers[sel];
+ const opts=FAMILIES.map(f=>`<option ${f===L.f?"selected":""} style="font-family:'${f}'">${f}</option>`).join("");
+ p.innerHTML=`<h4>Текст</h4><textarea id="pt">${esc(L.t)}</textarea><div class="hint">*слово* в звёздочках = цвет акцента</div>
+  <label>Шрифт</label><select id="pf">${opts}</select>
+  <label>Размер</label><div class="row"><input type="range" id="pr" min="12" max="320" value="${L.px}"><input type="number" id="pn" min="8" max="400" value="${L.px}" style="max-width:70px"></div>
+  <div class="row"><div><label>Цвет</label><input type="color" id="pc" value="${L.c}"></div><div><label>Акцент</label><input type="color" id="pa" value="${L.a}"></div></div>
+  <label>Выравнивание</label><div class="seg">${["left","center","right"].map(a=>`<button data-al="${a}" class="${L.al===a?"on":""}">${{left:"Слева",center:"По центру",right:"Справа"}[a]}</button>`).join("")}</div>
+  <label>Межстрочный: <span id="lhv">${L.lh.toFixed(2)}</span></label><input type="range" id="pl" min="0.8" max="2" step="0.02" value="${L.lh}">
+  <label>Ширина блока</label><input type="range" id="pw" min="60" max="${W}" value="${L.w}">
+  <div class="row" style="margin-top:12px"><button id="center">Центр по горизонтали</button></div>`;
+ const live=(k,v)=>{L[k]=v;const d=slide.querySelector(`.layer[data-i="${sel}"]`);
+  if(d){Object.assign(d.style,{left:L.x+"px",width:L.w+"px",fontFamily:`"${L.f}"`,fontSize:L.px+"px",lineHeight:L.lh,color:L.c,textAlign:L.al});d.innerHTML=html(L)+'<div class="handle"></div>'}
+  save();thumb(cur)};
+ const once=el=>{el.addEventListener("focus",push,{once:true});el.addEventListener("pointerdown",push,{once:true})};
+ [$("pt"),$("pr"),$("pn"),$("pc"),$("pa"),$("pl"),$("pw")].forEach(once);
+ $("pt").oninput=e=>live("t",e.target.value);
+ $("pf").onchange=e=>{push();live("f",e.target.value)};
+ $("pr").oninput=e=>{$("pn").value=e.target.value;live("px",+e.target.value)};
+ $("pn").oninput=e=>{$("pr").value=e.target.value;live("px",+e.target.value||L.px)};
+ $("pc").oninput=e=>live("c",e.target.value);$("pa").oninput=e=>live("a",e.target.value);
+ $("pl").oninput=e=>{$("lhv").textContent=(+e.target.value).toFixed(2);live("lh",+e.target.value)};
+ $("pw").oninput=e=>live("w",+e.target.value);
+ p.querySelectorAll(".seg button").forEach(b=>b.onclick=()=>{push();live("al",b.dataset.al);panel()});
+ $("center").onclick=()=>{push();live("x",Math.round((W-L.w)/2))};
+}
+
+// ---- drag / resize on the slide
+let drag=null;
+slide.addEventListener("pointerdown",e=>{
+ const d=e.target.closest(".layer");
+ if(!d){if(sel>=0){sel=-1;draw()}return}
+ const i=+d.dataset.i;if(i!==sel){sel=i;draw()}
+ const L=S[cur].layers[sel];push();
+ drag={mode:e.target.classList.contains("handle")?"w":"m",x:e.clientX,y:e.clientY,L0:{...L},moved:false};
+ slide.setPointerCapture(e.pointerId);e.preventDefault()});
+slide.addEventListener("pointermove",e=>{if(!drag)return;
+ const L=S[cur].layers[sel],dx=(e.clientX-drag.x)/scale,dy=(e.clientY-drag.y)/scale;drag.moved=true;
+ const d=slide.querySelector(`.layer[data-i="${sel}"]`);
+ if(drag.mode==="w"){L.w=Math.max(40,Math.round(drag.L0.w+dx));d.style.width=L.w+"px"}
+ else{let x=Math.round(drag.L0.x+dx);const c=x+L.w/2,g=$("guide");
+  if(Math.abs(c-W/2)<8){x=Math.round(W/2-L.w/2);g.style.display="block";g.style.left=(W/2-1)+"px"}else g.style.display="none";
+  L.x=x;L.y=Math.round(drag.L0.y+dy);d.style.left=L.x+"px";d.style.top=L.y+"px"}});
+slide.addEventListener("pointerup",()=>{if(!drag)return;$("guide").style.display="none";
+ if(!drag.moved)hist.pop();drag=null;save();thumb(cur);panel()});
+slide.addEventListener("dblclick",e=>{if(e.target.closest(".layer")){const t=$("pt");if(t){t.focus();t.select()}}});
+
+document.addEventListener("keydown",e=>{
+ const typing=/TEXTAREA|INPUT|SELECT/.test(document.activeElement.tagName);
+ if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==="z"&&!typing){e.preventDefault();undo();return}
+ if(typing||sel<0)return;const L=S[cur].layers[sel],k=e.shiftKey?10:1;
+ const mv={ArrowLeft:[-k,0],ArrowRight:[k,0],ArrowUp:[0,-k],ArrowDown:[0,k]}[e.key];
+ if(mv){e.preventDefault();L.x+=mv[0];L.y+=mv[1];changed();return}
+ if(e.key==="Delete"||e.key==="Backspace"){e.preventDefault();delSel()}});
+
+function undo(){if(!hist.length)return;S=JSON.parse(hist.pop());sel=-1;changed(true)}
+function delSel(){if(sel<0)return;push();S[cur].layers.splice(sel,1);sel=-1;changed()}
+$("undo").onclick=undo;$("del").onclick=delSel;
+$("add").onclick=()=>{push();const L0=S[cur].layers.find(l=>l.px<60)||S[cur].layers[0]||{f:FAMILIES[0],c:"#111111",a:"#e8462f"};
+ S[cur].layers.push({t:"Новый текст",f:L0.f,px:56,c:L0.c,a:L0.a,x:96,y:Math.round(H/2-40),w:W-192,al:"left",lh:1.2});
+ sel=S[cur].layers.length-1;changed();setTimeout(()=>{const t=$("pt");t.focus();t.select()},0)};
+
+// ---- export: the same layout drawn on a canvas
+function wrapLines(ctx,L){const lines=[],sp=ctx.measureText(" ").width;
+ for(const para of L.t.split("\n")){let line=[],lw=0,acc=false;const words=[];
+  for(const p of para.split(/(\*)/)){if(p==="*"){acc=!acc;continue}for(const w of p.split(/(\s+)/)){if(w&&!/^\s+$/.test(w))words.push([w,acc]);else if(w&&words.length)words[words.length-1].push(true)}}
+  for(const wd of words){const ww=ctx.measureText(wd[0]).width;if(line.length&&lw+sp+ww>L.w+0.5){lines.push([line,lw]);line=[];lw=0}lw+=(line.length?sp:0)+ww;line.push(wd)}
+  lines.push([line,lw])}
+ return lines}
+async function render(i,k=1){
+ await Promise.all(FAMILIES.map(f=>document.fonts.load(`40px "${f}"`).catch(()=>0)));
+ const img=IMGS[i];if(!img.complete)await new Promise(r=>img.onload=r);
+ const c=document.createElement("canvas");c.width=Math.round(W*k);c.height=Math.round(H*k);const ctx=c.getContext("2d");
+ ctx.scale(k,k);ctx.fillStyle=S[i].bg;ctx.fillRect(0,0,W,H);ctx.drawImage(img,0,0,W,H);
+ for(const L of S[i].layers){ctx.font=`${L.px}px "${L.f}"`;ctx.textBaseline="alphabetic";
+  const m=ctx.measureText("Hgй"),asc=m.fontBoundingBoxAscent||L.px*.8,des=m.fontBoundingBoxDescent||L.px*.2,lh=L.px*L.lh,sp=ctx.measureText(" ").width;
+  wrapLines(ctx,L).forEach(([line,lw],n)=>{let x=L.al==="center"?L.x+(L.w-lw)/2:L.al==="right"?L.x+L.w-lw:L.x;
+   const y=L.y+n*lh+(lh-(asc+des))/2+asc;
+   for(const [w,a] of line){ctx.fillStyle=a?L.a:L.c;ctx.fillText(w,x,y);x+=ctx.measureText(w).width+sp}})}
+ return c}
+let tt={};
+function thumb(i){const list=i===null?S.map((_,k)=>k):[i];for(const k of list){clearTimeout(tt[k]);tt[k]=setTimeout(async()=>{
+ const c=await render(k,0.16);const im=$("thumbs").children[k];if(im)im.src=c.toDataURL()},i===null?0:250)}}
+function pad(n){return String(n+1).padStart(2,"0")}
+async function download(i){const c=await render(i,1),url=c.toDataURL("image/png"),a=document.createElement("a");
+ a.href=url;a.download=`${DATA.name} ${pad(i)}.png`;document.body.appendChild(a);a.click();a.remove();return url}
+$("one").onclick=async()=>{const url=await download(cur);if(window.self!==window.top){$("mimg").src=url;$("modal").style.display="flex"}};
+$("all").onclick=async()=>{for(let i=0;i<S.length;i++){await download(i);await new Promise(r=>setTimeout(r,400))}};
+$("mclose").onclick=()=>$("modal").style.display="none";
+
+function thumbs(){const t=$("thumbs");t.innerHTML="";S.forEach((_,i)=>{const im=document.createElement("img");im.alt=`Слайд ${i+1}`;
+ if(i===cur)im.className="on";im.onclick=()=>{cur=i;sel=-1;[...t.children].forEach((x,k)=>x.className=k===cur?"on":"");draw()};t.appendChild(im)});thumb(null)}
+window.addEventListener("resize",fit);
+document.fonts.ready.then(()=>{fit();thumbs();draw()});
+fit();draw();
+</script>
+</body>
+</html>

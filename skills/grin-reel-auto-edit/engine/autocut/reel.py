@@ -106,6 +106,10 @@ def write_ass(spec: dict, out: Path) -> Path:
             f"&H00000000,&H80000000,-1,0,0,0,{ts.get('scale_x', 100)},{ts.get('scale_y', 100)},0,0,1,0,"
             f"{ts.get('shadow', 2)},5,40,40,0,1")
     ev = []
+    if spec.get("scenes"):
+        from .scenes import ass_events, ass_styles, in_scene
+        styles += ass_styles(spec, H)
+        ev += ass_events(spec, W, H)
     # ---- safe zone + face: one level for all captions, one for the title
     from .safezone import DEFAULT, scaled, face_box, place_block, right_edge
     z = scaled(spec.get("safe_zone") or DEFAULT, W, H)
@@ -147,6 +151,8 @@ def write_ass(spec: dict, out: Path) -> Path:
     fade = int(cs.get("fade_ms", 80))
     gap = cs.get("line_gap", int(cs["size"] * 0.7))
     caps = spec.get("captions", [])
+    if spec.get("scenes"):  # the scene typesets the words itself
+        caps = [c for c in caps if not in_scene(spec, (c["start"] + c["end"]) / 2)]
     nmax = max((len(c["text"].split("\n")) for c in caps), default=1)
     cap_c = place_block(yc(cs["y"]), gap * (nmax - 1) + cs["size"], z, face)
     up = (lambda x: x.upper()) if cs.get("uppercase") else (lambda x: x)
@@ -230,6 +236,9 @@ def write_ass(spec: dict, out: Path) -> Path:
 # ------------------------------------------------------------------ final render
 def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = False) -> Path:
     """One ffmpeg pass. Memory stays ~constant (each input is decoded as a stream)."""
+    if not spec.get("_snapped") and not spec.get("raw_cuts"):
+        from .cutsafe import snap_voice
+        snap_voice(spec, lambda k: _src(spec, k)); spec["_snapped"] = True
     W, H, FPS = spec["canvas"]["w"], spec["canvas"]["h"], spec["canvas"]["fps"]
     if preview:
         W, H = W // 2, H // 2
@@ -266,13 +275,19 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
     cx = int((sw - W) / 2 - ax * W / 2)
     cy = int((sh - H) / 2 + ay * H / 2)
     vlabels, alabels = [], []
+    from .audioclean import clean
+    vsrc = {}  # talking clips with cleaned voice (denoise + -14 LUFS), cached in the job folder
+    for key in {seg["src"] for seg in spec["voice"]}:
+        vsrc[key] = _src(spec, key) if spec.get("raw_audio") else clean(_src(spec, key), Path(spec["_base"]) / "clean")
     for k, seg in enumerate(spec["voice"]):
-        i = add_input(_src(spec, seg["src"]), seg["in"], seg["dur"])
+        i = add_input(vsrc[seg["src"]], seg["in"], seg["dur"])
         fc.append(f"[{i}:v]fps={FPS},scale={sw}:{sh}:force_original_aspect_ratio=increase:flags=lanczos,"
                   f"crop={sw}:{sh},crop={W}:{H}:{cx}:{cy},setsar=1"
                   f"{_gain(look.get('gain'))}{wb_filter(look.get('wb_gain'))}{lut(look.get('lut'), look.get('lut_mix'))}{adjust_filters(look.get('adjust'))}"
                   f",format=yuv420p,setpts=PTS-STARTPTS[av{k}]")
-        fc.append(f"[{i}:a]aresample=48000,asetpts=PTS-STARTPTS[aa{k}]")
+        fd = min(0.012, seg["dur"] / 4)  # micro-fades: no clicks at cut points
+        fc.append(f"[{i}:a]aresample=48000,asetpts=PTS-STARTPTS,afade=t=in:d={fd:.3f},"
+                  f"afade=t=out:st={seg['dur'] - fd:.4f}:d={fd:.3f}[aa{k}]")
         vlabels.append(f"[av{k}]")
         alabels.append(f"[aa{k}]")
     fc.append(f"{''.join(vlabels)}concat=n={len(vlabels)}:v=1:a=0[base]")
@@ -280,6 +295,9 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
 
     # B-roll inserts (video only; voice keeps running underneath = J/L cuts)
     last, bl = "base", spec.get("broll_look", {})
+    if spec.get("scenes"):  # card / split scenes (scenes.py)
+        from .scenes import video_filters
+        last = video_filters(spec, fc, last, W, H, FPS)
     for k, b in enumerate(spec.get("broll", [])):
         sp = b.get("speed", 1.0)
         if b.get("image"):  # photo: gentle push-in (Ken Burns), same grade as video B-roll
@@ -306,7 +324,9 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
     if sh := spec.get("shadow"):
         i = add_raw("-loop", "1", "-framerate", str(FPS), "-t", f"{dur:.3f}", "-i", _p(spec, sh))
         fc.append(f"[{i}:v]format=rgba,scale={W}:{H}[shd]")
-        fc.append(f"[{last}][shd]overlay=0:0:format=auto:shortest=1[vsh]")
+        off = "+".join(f"between(t,{x['start']:.3f},{x['end']:.3f})" for x in spec.get("scenes") or [])
+        en = f":enable='not({off})'" if off else ""  # no dark gradient over the light scene background
+        fc.append(f"[{last}][shd]overlay=0:0:format=auto:shortest=1{en}[vsh]")
         last = "vsh"
 
     # captions + title
@@ -394,6 +414,9 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
 
 # ------------------------------------------------------------------ CapCut draft
 def capcut_reel(spec: dict, name: str, draft_root: Path | None = None) -> Path:
+    if not spec.get("_snapped") and not spec.get("raw_cuts"):
+        from .cutsafe import snap_voice
+        snap_voice(spec, lambda k: _src(spec, k)); spec["_snapped"] = True
     try:
         import pycapcut as cc
     except ImportError as e:

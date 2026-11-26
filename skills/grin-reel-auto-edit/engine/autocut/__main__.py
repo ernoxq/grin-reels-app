@@ -42,7 +42,7 @@ def _finish(job: Path, t0: float) -> dict:
     if args.get("deliver") or args.get("export"):
         from .nle import export_all
         name = args.get("name") or time.strftime("Рилс %d.%m %H-%M")
-        kinds = tuple(k.strip() for k in (args.get("export") or "").split(",") if k.strip()) or ("srt",)
+        kinds = tuple(k.strip() for k in (args.get("export") or "").split(",") if k.strip()) or ("capcut",)
         extra = export_all(spec_path, Path(args["deliver"]) if args.get("deliver") else job, name, video,
                            Path(args["capcut_root"]) if args.get("capcut_root") else None, args.get("map"), kinds)
     return {**extra, "video": extra.get("video") or str(Path(video).resolve()), "sec": round(s["duration"], 1),
@@ -98,7 +98,7 @@ def main() -> None:
     ex.add_argument("--deliver", type=Path, required=True)
     ex.add_argument("--name", required=True)
     ex.add_argument("--video", type=Path)
-    ex.add_argument("--export", default="capcut,fcpxml,srt")
+    ex.add_argument("--export", default="capcut")
     ex.add_argument("--capcut-root", type=Path)
     ex.add_argument("--map", nargs="*", default=[])
 
@@ -114,7 +114,7 @@ def main() -> None:
     au.add_argument("--all-talking", action="store_true", help="every video is a part of the talk, join them all")
     au.add_argument("--deliver", type=Path, help="folder for the results (the «Готовое» folder)")
     au.add_argument("--name", help="name of the reel / project (default: Рилс <date time>)")
-    au.add_argument("--export", default="", help="comma list: capcut,fcpxml,srt (editable projects)")
+    au.add_argument("--export", default="", help="capcut (editable project; fcpxml/srt still possible but not used by the skills)")
     au.add_argument("--capcut-root", type=Path, help="CapCut drafts folder …/com.lveditor.draft as seen here")
     au.add_argument("--map", nargs="*", default=[], help="THIS_SHELL_PATH=REAL_COMPUTER_PATH for paths inside projects")
     au.add_argument("--plan", action="store_true", help="storyboard only: print the plan, render later with `finish`")
@@ -156,6 +156,9 @@ def main() -> None:
     so.add_argument("--capcut", help="also write a layered CapCut project with this name")
     so.add_argument("--capcut-root"); so.add_argument("--media-dir"); so.add_argument("--map", nargs="*", default=[])
     sub.add_parser("studio-help", help="scene types for scenes.json")
+    sc = sub.add_parser("scene", help="speaker shrinks into a card / half screen, words typeset around (scenes.py)")
+    sc.add_argument("spec"); sc.add_argument("kind", choices=["card", "split", "clear"])
+    sc.add_argument("--from", dest="frm"); sc.add_argument("--to"); sc.add_argument("--key"); sc.add_argument("--list")
     pl = sub.add_parser("place", help="put a photo/video/icon on top at the given words, then re-render")
     pl.add_argument("spec"); pl.add_argument("file", nargs="?")
     pl.add_argument("--words"); pl.add_argument("--at", type=float); pl.add_argument("--dur", type=float)
@@ -170,6 +173,29 @@ def main() -> None:
     pk = sub.add_parser("pick", help="sort dropped files: talking video vs inserts")
     pk.add_argument("files", nargs="+")
     sub.add_parser("presets", help="(re)build colour presets -> library/luts/presets")
+
+    dg = sub.add_parser("design", help="Дизайнер: slides.json -> PNG slides + editable CapCut project")
+    dg.add_argument("slides", type=Path)
+    dg.add_argument("--out", type=Path, default=Path("design_out"))
+    dg.add_argument("--taste", type=Path, help="taste_<name>.json from `taste`")
+    dg.add_argument("--name")
+    dg.add_argument("--capcut-root", help="…/com.lveditor.draft (put the project straight into CapCut)")
+    dg.add_argument("--map", action="append", default=[], help="shell path=real path on the Mac")
+    dg.add_argument("--no-editor", action="store_true", help="skip the HTML editor")
+    dg.add_argument("--canvas", type=Path, help="also write artboards for Claude's Design canvas into this folder")
+    cf = sub.add_parser("canvas-fill", help="put uploaded asset urls into the canvas artboards")
+    cf.add_argument("root", type=Path)
+    cf.add_argument("pairs", nargs="+", help="slide_01.png=/_blob/…")
+    dg.add_argument("--capcut", action="store_true", help="also write a CapCut draft (off: carousels are edited in the chat)")
+    ts_ = sub.add_parser("taste", help="Губка: learn a design taste from 1-10 pictures/videos")
+    ts_.add_argument("refs", type=Path, nargs="+")
+    ts_.add_argument("--name", required=True)
+    ts_.add_argument("--out", type=Path)
+    rv = sub.add_parser("review", help="Антикринж: measure a finished reel (pace, hook, pauses, transcript, sheet)")
+    rv.add_argument("reel", type=Path)
+    rv.add_argument("--out", type=Path)
+    rv.add_argument("--no-speech", action="store_true")
+    rv.add_argument("--lang")
 
     sv = sub.add_parser("serve")
     sv.add_argument("--host", default="0.0.0.0")
@@ -320,6 +346,9 @@ def main() -> None:
             r.update(capcut(job, Path(a.scenes), a.capcut, root, Path(a.media_dir) if a.media_dir else job / "studio" / "capcut_media",
                             Path(a.video) if a.video else None, a.map))
         print(r["plan"] if a.plan else json.dumps(r, ensure_ascii=False))
+    elif a.cmd == "scene":
+        from .scenes import scene
+        print(json.dumps(scene(a.spec, a.kind, a.frm, a.to, a.key, a.list), ensure_ascii=False))
     elif a.cmd == "place":
         from .place import place
         if a.motion:
@@ -342,6 +371,22 @@ def main() -> None:
     elif a.cmd == "presets":
         from .grade import build_presets
         print(len(build_presets()), "presets")
+    elif a.cmd == "design":
+        from .design import design
+        print(json.dumps(design(a.slides, a.out, a.taste, a.name, Path(a.capcut_root) if a.capcut_root else None,
+                                a.map, a.capcut, not a.no_editor, a.canvas), ensure_ascii=False))
+    elif a.cmd == "canvas-fill":
+        from .canvas import fill
+        print(json.dumps(fill(a.root, a.pairs), ensure_ascii=False))
+    elif a.cmd == "taste":
+        from .taste import learn_taste
+        print(json.dumps(learn_taste(a.refs, a.name, a.out), ensure_ascii=False))
+    elif a.cmd == "review":
+        from .review import review
+        r = review(a.reel, a.out or Path("review") / a.reel.stem, not a.no_speech, a.lang)
+        print(json.dumps({k: v for k, v in r.items() if k != "transcript"}, ensure_ascii=False))
+        for p in r.get("transcript", []):
+            print(f"[{p['t']}] {p['text']}")
     elif a.cmd == "serve":
         import uvicorn
         uvicorn.run("autocut.server:app", host=a.host, port=a.port, workers=1)
