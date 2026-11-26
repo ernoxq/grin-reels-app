@@ -227,7 +227,7 @@ def render_slide(s: dict, i: int, n: int, th: dict, W: int, H: int) -> tuple[Ima
     up = bool(th.get("uppercase"))
     center = th.get("align") == "center"
     al = "center" if center else "left"
-    bg = Image.new("RGB", (W, H), rgb(bgc))
+    bg = Image.new("RGBA", (W, H), (0, 0, 0, 0))  # transparent: the slide colour is underneath (editable)
     blocks: list[Block] = []
     warn: list[str] = []
     cw = W - 2 * M
@@ -244,12 +244,14 @@ def render_slide(s: dict, i: int, n: int, th: dict, W: int, H: int) -> tuple[Ima
             hb.align = "right"
             f = font(bf, hb.px)
             hb.x = W - M - int(f.getlength(hb.text)) - 1
+            hb.w = int(f.getlength(hb.text)) + 4
+            hb.align = "left"
             blocks.append(hb)
 
     if lay == "cover":
         light = ink
         if photo:
-            bg = _shade(cover_fit(photo, W, H, s.get("focus", "center")))
+            bg = _shade(cover_fit(photo, W, H, s.get("focus", "center"))).convert("RGBA")
             light = "#FFFFFF"
         head(light)
         y_end = bottom - 70
@@ -479,7 +481,8 @@ def write_capcut(slides: list[tuple[str, list[dict]]], W: int, H: int, out_dir: 
 
 # ------------------------------------------------------------------ one call
 def design(spec_path: Path, out: Path, taste: Path | None = None, name: str | None = None,
-           capcut_root: Path | None = None, maps: list[str] | None = None, capcut: bool = False) -> dict:
+           capcut_root: Path | None = None, maps: list[str] | None = None, capcut: bool = False,
+           editor: bool = True, canvas: Path | None = None) -> dict:
     from .nle import _mapper
     spec = json.loads(Path(spec_path).read_text())
     tst = json.loads(Path(taste).read_text()) if taste else None
@@ -490,15 +493,18 @@ def design(spec_path: Path, out: Path, taste: Path | None = None, name: str | No
     proj = out / f"{name} - проект"
     layers = proj / "слои"
     (layers if capcut else proj).mkdir(parents=True, exist_ok=True)
-    pngs, cc_slides, warns, fonts = [], [], [], set()
+    pngs, cc_slides, warns, fonts, overlays, texts = [], [], [], set(), [], []
     n = len(spec["slides"])
     for i, s in enumerate(spec["slides"]):
         bg, blocks, w = render_slide(s, i, n, th, W, H)
         warns += w
         bgp = layers / f"фон_{i + 1:02d}.png"
+        full = Image.new("RGB", (W, H), rgb(th["bg"]))
+        full.paste(bg, (0, 0), bg)
         if capcut:
-            bg.save(bgp)
-        full = bg.copy()
+            full.save(bgp)
+        overlays.append(bg)
+        texts.append(blocks)
         d = ImageDraw.Draw(full)
         for b in blocks:
             b.draw(d)
@@ -526,6 +532,12 @@ def design(spec_path: Path, out: Path, taste: Path | None = None, name: str | No
         sheet.paste(Image.open(p).resize((tw, th_), Image.LANCZOS), (8 + (i % cols) * (tw + 8), 8 + (i // cols) * (th_ + 8)))
     sheet.save(proj / "sheet.png")
     res = {"slides": [str(p) for p in pngs], "sheet": str(proj / "sheet.png"), "size": f"{W}x{H}", "warnings": warns}
+    if canvas:
+        from .canvas import write_canvas
+        res["canvas"] = write_canvas(Path(canvas), name, W, H, th["bg"], overlays, texts)
+    if editor:
+        from .editor import write_editor
+        res["editor"] = str(write_editor(out / f"{name} - редактор.html", name, W, H, th["bg"], overlays, texts, fonts))
     if capcut:
         mapper = _mapper(maps or [])
         if capcut_root and Path(capcut_root).exists():

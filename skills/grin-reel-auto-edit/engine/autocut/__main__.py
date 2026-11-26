@@ -178,6 +178,11 @@ def main() -> None:
     dg.add_argument("--name")
     dg.add_argument("--capcut-root", help="…/com.lveditor.draft (put the project straight into CapCut)")
     dg.add_argument("--map", action="append", default=[], help="shell path=real path on the Mac")
+    dg.add_argument("--no-editor", action="store_true", help="skip the HTML editor")
+    dg.add_argument("--canvas", type=Path, help="also write artboards for Claude's Design canvas into this folder")
+    cf = sub.add_parser("canvas-fill", help="put uploaded asset urls into the canvas artboards")
+    cf.add_argument("root", type=Path)
+    cf.add_argument("pairs", nargs="+", help="slide_01.png=/_blob/…")
     dg.add_argument("--capcut", action="store_true", help="also write a CapCut draft (off: carousels are edited in the chat)")
     ts_ = sub.add_parser("taste", help="Губка: learn a design taste from 1-10 pictures/videos")
     ts_.add_argument("refs", type=Path, nargs="+")
@@ -363,7 +368,10 @@ def main() -> None:
     elif a.cmd == "design":
         from .design import design
         print(json.dumps(design(a.slides, a.out, a.taste, a.name, Path(a.capcut_root) if a.capcut_root else None,
-                                a.map, a.capcut), ensure_ascii=False))
+                                a.map, a.capcut, not a.no_editor, a.canvas), ensure_ascii=False))
+    elif a.cmd == "canvas-fill":
+        from .canvas import fill
+        print(json.dumps(fill(a.root, a.pairs), ensure_ascii=False))
     elif a.cmd == "taste":
         from .taste import learn_taste
         print(json.dumps(learn_taste(a.refs, a.name, a.out), ensure_ascii=False))
