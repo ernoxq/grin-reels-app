@@ -489,14 +489,15 @@ def design(spec_path: Path, out: Path, taste: Path | None = None, name: str | No
     out.mkdir(parents=True, exist_ok=True)
     proj = out / f"{name} - проект"
     layers = proj / "слои"
-    layers.mkdir(parents=True, exist_ok=True)
+    (layers if capcut else proj).mkdir(parents=True, exist_ok=True)
     pngs, cc_slides, warns, fonts = [], [], [], set()
     n = len(spec["slides"])
     for i, s in enumerate(spec["slides"]):
         bg, blocks, w = render_slide(s, i, n, th, W, H)
         warns += w
         bgp = layers / f"фон_{i + 1:02d}.png"
-        bg.save(bgp)
+        if capcut:
+            bg.save(bgp)
         full = bg.copy()
         d = ImageDraw.Draw(full)
         for b in blocks:
@@ -508,9 +509,9 @@ def design(spec_path: Path, out: Path, taste: Path | None = None, name: str | No
         cc_slides.append((str(bgp), [b.capcut() for b in blocks]))
     # fonts next to the project so CapCut finds the exact typeface
     fdir = proj / "шрифты"
-    fdir.mkdir(exist_ok=True)
     fmap = {}
-    for f in fonts:
+    for f in (fonts if capcut else []):
+        fdir.mkdir(exist_ok=True)
         shutil.copy2(f, fdir / f.name)
         fmap[str(f)] = str(fdir / f.name)
     for _, ts in cc_slides:
