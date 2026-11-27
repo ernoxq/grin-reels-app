@@ -124,6 +124,7 @@ def main() -> None:
     au.add_argument("--no-inserts", action="store_true", help="talking parts only, no B-roll")
     au.add_argument("--trim", nargs="*", default=[], help='cut single words in place: "[Но] пока что", "вот [этот] весь" (kept between re-plans)')
     au.add_argument("--untrim", nargs="*", default=[], help="undo an earlier --trim (same text)")
+    au.add_argument("--keep-fillers", action="store_true", help="don't cut stand-alone «ну / вот / типа / эээ»")
     au.add_argument("--target", type=float, help="wanted length in seconds: the plan says how much to cut")
     au.add_argument("--vocab", help='names/brands/terms the speaker uses, comma-separated ("Claude, Кишинёв, Мария")')
 
@@ -310,12 +311,17 @@ def main() -> None:
         trims = [t for t in prev.get("trim", []) if t not in a.untrim] + [t for t in a.trim if t not in prev.get("trim", [])]
         args["trim"] = trims
         args["target"] = a.target or prev.get("target")
-        if drops or fixes or trims:
+        args["keep_fillers"] = a.keep_fillers or prev.get("keep_fillers", False)
+        if drops or fixes or trims or not args["keep_fillers"]:
             a.drop = drops
-            from .storyboard import drop_phrases, fix_words, trim_words
+            from .storyboard import drop_phrases, fix_words, trim_fillers, trim_words
             w = json.loads((a.out / "words.json").read_text())
-            (a.out / "words_edit.json").write_text(json.dumps(drop_phrases(trim_words(fix_words(w, fixes), trims), a.drop),
-                                                              ensure_ascii=False))
+            w = trim_words(fix_words(w, fixes), trims)
+            gone = []
+            if not args["keep_fillers"]:
+                w, gone = trim_fillers(w)
+            (a.out / "fillers.json").write_text(json.dumps(gone, ensure_ascii=False))
+            (a.out / "words_edit.json").write_text(json.dumps(drop_phrases(w, a.drop), ensure_ascii=False))
             spec_path = run(str(main), args["inserts"], args["style"], str(a.out), script=args["script"],
                             title=a.title, words_json=str(a.out / "words_edit.json"), language=a.lang)
             _split(spec_path, parts)
