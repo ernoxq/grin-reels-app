@@ -57,7 +57,7 @@ def pause_at(d: np.ndarray, t: float) -> tuple[float, float] | None:
     g = min(gaps, key=lambda g: 0 if g[0] <= t <= g[1] else min(abs(t - g[0]), abs(t - g[1])))
     if not (g[0] - 0.6 <= t <= g[1] + 0.6):
         return None
-    s, e = g[0] + 0.07, g[1] - 0.04  # a bit more room after the word: its decay stays
+    s, e = g[0] + 0.2, g[1] - 0.06  # 200 ms after the word (a final «к» bursts ~0.1 s after the vowel, plus the 35 ms fade): 150 ms after the word: a final «к», «т», «п» bursts ~0.1 s after the vowel
     return (round(s, 3), round(e, 3)) if e - s > 0.05 else None
 
 

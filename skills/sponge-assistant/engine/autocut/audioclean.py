@@ -60,22 +60,38 @@ def has_audio(path: str) -> bool:
     return "Audio:" in r.stderr
 
 
-def clean(src: str | Path, cache_dir: str | Path, suffix: str = " (чистый звук)") -> str:
-    """Return the path of a cleaned copy of src (made once, reused while src is unchanged)."""
+def _dur(path: str) -> float:
+    r = subprocess.run([FFMPEG, "-hide_banner", "-i", path], capture_output=True, text=True).stderr
+    m = re.search(r"Duration: (\d+):(\d+):([\d.]+)", r)
+    return int(m.group(1)) * 3600 + int(m.group(2)) * 60 + float(m.group(3)) if m else 0.0
+
+
+def clean(src: str | Path, cache_dir: str | Path, suffix: str = " (чистый звук)", voice: str | None = None) -> str:
+    """Return the path of a copy of src with its voice brought to -14 LUFS (made once, reused while
+    src is unchanged). voice = the same recording's audio processed elsewhere (Adobe Podcast Enhance,
+    same length): it replaces the camera audio, so the montage stays frame-exact."""
     src = Path(src)
     if not src.exists() or src.suffix.lower() in {".png", ".jpg", ".jpeg", ".webp", ".heic"} or not has_audio(str(src)):
         return str(src)
     cache = Path(cache_dir)
     cache.mkdir(parents=True, exist_ok=True)
-    dst = cache / f"{src.stem}{suffix}.mov"  # PCM inside: no second lossy encode before the final one
-    if dst.exists() and dst.stat().st_mtime >= src.stat().st_mtime and dst.stat().st_size > 0:
+    tag = f"{suffix} + {Path(voice).stem}" if voice else suffix
+    dst = cache / f"{src.stem}{tag}.mov"  # PCM inside: no second lossy encode before the final one
+    newest = max(src.stat().st_mtime, Path(voice).stat().st_mtime if voice else 0)
+    if dst.exists() and dst.stat().st_mtime >= newest and dst.stat().st_size > 0:
         return str(dst)
-    dn = denoise(str(src))
-    lufs = _lufs(str(src), dn)
+    asrc = str(voice) if voice else str(src)
+    if voice and abs(_dur(asrc) - _dur(str(src))) > 0.3:
+        raise RuntimeError(f"voice file {Path(voice).name} is {_dur(asrc):.1f} s, the video {_dur(str(src)):.1f} s: "
+                           "it must be the same recording, processed whole (same length)")
+    dn = "highpass=f=70" if voice else denoise(str(src))  # an enhanced voice is never processed again
+    lufs = _lufs(asrc, dn)
     gain = 0.0 if lufs is None else max(-12.0, min(20.0, TARGET_LUFS - lufs))
     af = f"{dn},volume={gain:.2f}dB,alimiter=limit=0.89:level=disabled,aresample=48000"
     tmp = dst.with_suffix(".part.mov")
-    subprocess.run([FFMPEG, "-v", "error", "-y", "-i", str(src), "-map", "0:v:0?", "-map", "0:a:0",
-                    "-c:v", "copy", "-af", af, "-c:a", "pcm_s16le", "-ar", "48000", str(tmp)], check=True)
+    cmd = [FFMPEG, "-v", "error", "-y", "-i", str(src)] + (["-i", asrc] if voice else []) + [
+        "-map", "0:v:0?", "-map", "1:a:0" if voice else "0:a:0", "-c:v", "copy", "-af", af,
+        "-c:a", "pcm_s16le", "-ar", "48000", str(tmp)]
+    subprocess.run(cmd, check=True)
     tmp.replace(dst)
     return str(dst)

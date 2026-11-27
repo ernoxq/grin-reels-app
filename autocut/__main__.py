@@ -172,7 +172,7 @@ def main() -> None:
     lk.add_argument("--color"); lk.add_argument("--highlight"); lk.add_argument("--anim", choices=["rise", "pop", "fade"])
     lk.add_argument("--punch", type=float)
     lk.add_argument("--frame", choices=["fill", "fit", "blur"]); lk.add_argument("--music"); lk.add_argument("--music-db", type=float)
-    lk.add_argument("--speed", type=float)
+    lk.add_argument("--speed", type=float); lk.add_argument("--voice-audio")
     sc = sub.add_parser("scene", help="speaker shrinks into a card / half screen, words typeset around (scenes.py)")
     sc.add_argument("spec"); sc.add_argument("kind", choices=["card", "split", "clear"])
     sc.add_argument("--from", dest="frm"); sc.add_argument("--to"); sc.add_argument("--key"); sc.add_argument("--list")
@@ -381,7 +381,7 @@ def main() -> None:
     elif a.cmd == "look":
         from .look import look
         print(json.dumps(look(a.spec, a.captions, a.size, a.y, a.font, a.upper, a.color, a.highlight, a.anim,
-                              a.punch, a.frame, a.music, a.music_db, a.speed), ensure_ascii=False))
+                              a.punch, a.frame, a.music, a.music_db, a.speed, a.voice_audio), ensure_ascii=False))
     elif a.cmd == "scene":
         from .scenes import scene
         print(json.dumps(scene(a.spec, a.kind, a.frm, a.to, a.key, a.list), ensure_ascii=False))

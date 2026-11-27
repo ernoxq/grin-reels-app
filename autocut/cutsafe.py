@@ -59,7 +59,7 @@ def _onset(d: np.ndarray, t: float, thr: float, limit: float) -> float:
         return _dip(d, t)
     while i < b:
         if (d[i:i + SUSTAIN] > thr).all():
-            return max(0.0, i / 100 - 0.03)
+            return max(0.0, i / 100 - 0.04)
         i += 1
     return t
 
@@ -176,6 +176,30 @@ def clicks(d: np.ndarray, s: float, e: float) -> list[tuple[float, float]]:
     return out
 
 
+def _breathe(d: np.ndarray, s2: float, e2: float, thr: float, lo: float, hi: float) -> tuple[float, float]:
+    """Natural air around a sentence, like an editor leaves: up to 80 ms more before the word and
+    160 ms more after it (≈0.3 s between sentences), but only through real room tone — it stops at
+    the first audible sound, so smacks and breaths stay out. lo/hi: hard limits (neighbours)."""
+    quiet = thr - 3
+    i = int(s2 * 100)
+    k = 0
+    while k < 8 and i - 1 >= max(0, int(lo * 100)) and d[i - 1] < quiet:
+        i -= 1; k += 1
+    j = int(e2 * 100)
+    k = 0
+    while k < 16 and j + 1 < min(len(d), int(hi * 100)) and d[j] < quiet:
+        j += 1; k += 1
+    return i / 100, j / 100
+
+
+def _mutes(spec: dict) -> list[dict]:
+    from pathlib import Path
+    import json
+    base = spec.get("_base")
+    f = Path(base) / "mute.json" if base else None
+    return json.loads(f.read_text()) if f and f.exists() else []
+
+
 def snap_voice(spec: dict, src_path) -> dict:
     """src_path(key) -> file path. Mutates and returns spec."""
     voice = spec.get("voice") or []
@@ -201,20 +225,55 @@ def snap_voice(spec: dict, src_path) -> dict:
                 s2 = max(s2, pe)
         if k + 1 < len(voice) and voice[k + 1]["src"] == seg["src"] and voice[k + 1]["in"] >= e:
             e2 = min(e2, voice[k + 1]["in"])
+        if not seg.get("cut_in") and not seg.get("cut_out"):  # sentence edges get natural air
+            lo = voice[k - 1]["in"] + voice[k - 1]["dur"] if k and voice[k - 1]["src"] == seg["src"] and voice[k - 1]["in"] < s else 0.0
+            hi = voice[k + 1]["in"] if k + 1 < len(voice) and voice[k + 1]["src"] == seg["src"] and voice[k + 1]["in"] > s else 1e9
+            s2, e2 = _breathe(d, s2, e2, thr, max(lo, s2 - 0.3), min(hi, e2 + 0.3))
         if e2 - s2 > 0.1:
             seg["in"], seg["dur"] = round(max(0.0, s2), 4), round(e2 - max(0.0, s2), 4)
-        seg.pop("duck", None)  # mouth noise is muted only where the person points (quiet.py): auto rules ate soft syllables
+        seg.pop("duck", None)
+        seg["_k"] = k
+
+    # pauses the person pointed at (quiet.py: «цоканье на 0:09») are cut out, not muted
+    from pathlib import Path as _P
+    mutes = _mutes(spec)
+    if mutes:
+        out = []
+        for seg in voice:
+            pieces = [seg]
+            for m in mutes:
+                if _P(m["src"]).name != _P(str(src_path(seg["src"]))).name:
+                    continue
+                nxt = []
+                for p in pieces:
+                    a, b = p["in"], p["in"] + p["dur"]
+                    if a + 0.05 < m["from"] and m["to"] < b - 0.05:
+                        nxt.append(dict(p, dur=round(m["from"] - a, 4)))
+                        nxt.append(dict(p, **{"in": round(m["to"], 4), "dur": round(b - m["to"], 4)}))
+                    else:
+                        nxt.append(p)
+                pieces = nxt
+            out += pieces
+        voice[:] = out
+        spec["voice"] = voice
 
     new, t = [], 0.0
     for seg in voice:
-        new.append((t, seg["in"]))
+        new.append((t, seg["in"], seg["dur"], seg["_k"]))
         t += seg["dur"]
+    for seg in voice:
+        seg.pop("_k", None)
 
     def remap(x: float) -> float:
-        for (o0, in0, d0), (n0, in1) in zip(old, new):
+        for k, (o0, in0, d0) in enumerate(old):
             if x <= o0 + d0 + 1e-6:
-                return round(max(n0, n0 + (x - o0) + (in0 - in1)), 4)
-        return round(x - sum(d for _, _, d in old) + t, 4)
+                src = in0 + max(0.0, x - o0)
+                ps = [p for p in new if p[3] == k]
+                for n0, in1, d1, _ in ps:
+                    if src <= in1 + d1:
+                        return round(n0 + max(0.0, src - in1), 4)
+                return round(ps[-1][0] + ps[-1][2], 4) if ps else round(x, 4)
+        return round(t, 4)
 
     def walk(o):
         if isinstance(o, dict):

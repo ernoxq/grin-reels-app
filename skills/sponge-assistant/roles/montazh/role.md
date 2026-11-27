@@ -44,7 +44,8 @@ First run: pass `--vocab "names, brands, terms"` you already know (their name, b
 Собираю так?»
 Build only after a yes or edits.
 
-**«цоканье / чмок / щелчок / вдох на 0:09»** → `python -m autocut quiet jobs/r1/spec.json 0:09 [1:16 …]`, then render. It mutes only the pause between words at that moment (the engine does not guess mouth noise on its own: it sounds like soft syllables). Reply says `muted_sec: 0` → that moment is inside a word; tell them. Skip the brief only if they said «сразу» / «без плана» or they already approved this plan.
+**Voice: never process it.** The engine only brings it to −14 LUFS (no denoise on clean recordings, no declick, no EQ). Don't add filters, don't "repair" it: every attempt so far made it worse. Mouth clicks («цоканье») all over → say plainly the engine can't remove them without hurting the voice and offer: run the ORIGINAL clip's audio through Adobe Podcast Enhance (podcast.adobe.com/enhance, free), send the file back → `look jobs/r1/spec.json --voice-audio enhanced.wav` → render. Montage, captions and timing stay the same.
+**One noise at a named moment («цоканье на 0:09»)** → `python -m autocut quiet jobs/r1/spec.json 0:09 [1:16 …]`, then render. It mutes only the pause between words at that moment (the engine does not guess mouth noise on its own: it sounds like soft syllables). Reply says `muted_sec: 0` → that moment is inside a word; tell them. Skip the brief only if they said «сразу» / «без плана» or they already approved this plan.
 - photo / video / icon on certain words: `place` (reference.md E); animated text: reference.md J.
 Render: `cd grin && nohup python -m autocut finish jobs/r1 > out.txt 2>&1 &`, poll, read the JSON line.
 «сразу» / «без плана» → skip `--plan`.

@@ -370,7 +370,8 @@ def export_all(spec_path: Path, deliver: Path, name: str, video: Path | None = N
         done = {}
         for m in tl["main"]:
             src = m["file"] if Path(m["file"]).is_absolute() else str(Path(spec_path).resolve().parent / m["file"])
-            m["file"] = done.setdefault(src, clean(src, assets))
+            va = (spec.get("voice_audio") or {}).get(Path(src).name)
+            m["file"] = done.setdefault(src, clean(src, assets, voice=va))
     fonts = {}
     for f in spec.get("fonts", []):
         src = app_root() / "library" / f
