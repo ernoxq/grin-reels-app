@@ -13,6 +13,8 @@ then: python -m autocut render jobs/r1/spec.json --out jobs/r1/final.mp4
 --frame     fill (crop to vertical) | fit (whole horizontal frame on black, captions under it; default for
             horizontal video) | blur (whole frame over its own blurred copy; only if asked)
 --music     file.mp3 [--music-db -20]: background track, looped, faded; -16 audible, -20 quiet («тихонько»), -24 barely
+--voice-audio enhanced.wav: the talking clip's audio cleaned in Adobe Podcast Enhance (same recording,
+            whole length) replaces the camera audio; montage stays exact. Several clips: put the clip name in the file name
 --speed     1.1: whole reel 10% faster, pitch stays (most creators do this); 1.0 off
 --punch     1.0 off, 1.06 subtle, 1.10 strong: every other cut is a bit closer (classic talking-head rhythm)
 """
@@ -41,7 +43,8 @@ PRESETS = {
 
 
 def look(spec_path: str, captions=None, size=None, y=None, font=None, upper=None, color=None,
-         highlight=None, anim=None, punch=None, frame=None, music=None, music_db=None, speed=None) -> dict:
+         highlight=None, anim=None, punch=None, frame=None, music=None, music_db=None, speed=None,
+         voice_audio=None) -> dict:
     sp = Path(spec_path)
     spec = json.loads(sp.read_text())
     cs = spec["caption_style"]
@@ -80,6 +83,14 @@ def look(spec_path: str, captions=None, size=None, y=None, font=None, upper=None
             bottom = (H - fh) * FRAME_TOP + fh
             cs["y"] = round(max(-0.6, 1 - 2 * (bottom + 0.07 * H) / H), 3)
             spec["avoid_face"] = False
+    if voice_audio:  # the same recording's audio from Adobe Podcast Enhance: replaces the camera audio
+        talk = {spec["sources"][v["src"]] for v in spec.get("voice", [])}
+        if len(talk) == 1:
+            spec.setdefault("voice_audio", {})[Path(str(next(iter(talk)))).name] = str(Path(voice_audio).resolve())
+        else:  # several clips: name the clip in the file name: «IMG_1234 enhanced.wav»
+            for t in talk:
+                if Path(str(t)).stem.lower() in Path(voice_audio).stem.lower():
+                    spec.setdefault("voice_audio", {})[Path(str(t)).name] = str(Path(voice_audio).resolve())
     if speed is not None:
         spec["speed"] = max(0.8, min(1.3, speed))
     if music:
@@ -89,7 +100,7 @@ def look(spec_path: str, captions=None, size=None, y=None, font=None, upper=None
     sp.write_text(json.dumps(spec, ensure_ascii=False, indent=1))
     return {"captions": {k: cs.get(k) for k in ("font_name", "size", "y", "uppercase", "anim", "mode")},
             "punch": spec.get("aroll_look", {}).get("punch", 1.0), "frame": spec.get("aroll_look", {}).get("frame", "fill"),
-            "music": spec.get("music"), "speed": spec.get("speed", 1.0)}
+            "music": spec.get("music"), "speed": spec.get("speed", 1.0), "voice_audio": spec.get("voice_audio")}
 
 
 def auto_frame(spec_path) -> str | None:

@@ -314,12 +314,13 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
     cy = int((sh - H) / 2 + ay * H / 2)
     vlabels, alabels = [], []
     mf = Path(spec["_base"]) / "mute.json"
-    mutes = json.loads(mf.read_text()) if mf.exists() else []
+    mutes = []  # mute.json is applied as cuts (snap_voice), never as a muted hole
     from .audioclean import clean
     vsrc = {}  # talking clips with cleaned voice (denoise + -14 LUFS), cached in the job folder
     for key in {seg["src"] for seg in spec["voice"]}:
-        vsrc[key] = _src(spec, key) if spec.get("raw_audio") else clean(_src(spec, key), Path(spec["_base"]) / "clean")
-    punch = float(look.get("punch") or 1.0)  # jump-cut punch-in: every other cut a bit closer
+        va = (spec.get("voice_audio") or {}).get(Path(str(_src(spec, key))).name)  # Adobe Enhance etc.
+        vsrc[key] = _src(spec, key) if spec.get("raw_audio") else clean(_src(spec, key), Path(spec["_base"]) / "clean", voice=va)
+    punch = float(look["punch"]) if look.get("punch") is not None else 1.04  # every other cut 4% closer: hides jump cuts
     for k, seg in enumerate(spec["voice"]):
         i = add_input(vsrc[seg["src"]], seg["in"], seg["dur"])
         P = punch if (k % 2 and punch > 1.0) else 1.0
@@ -330,7 +331,9 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
         frame = look.get("frame", "fill")
         if frame in ("fit", "blur"):  # horizontal video: whole frame visible, slightly above centre
             top = FRAME_TOP
-            fg = f"scale={W}:-2:flags=lanczos,setsar=1{grade}"
+            fw = int(round(W * P / 2) * 2)  # punch-in: the frame a bit bigger, cropped back to full width
+            fg = (f"scale={fw}:-2:flags=lanczos,crop={W}:ih:(iw-{W})/2:0,setsar=1{grade}" if P > 1.0
+                  else f"scale={W}:-2:flags=lanczos,setsar=1{grade}")
             if frame == "fit":
                 fc.append(f"[{i}:v]fps={FPS},{fg},pad={W}:{H}:0:'trunc((oh-ih)*{top}/2)*2':color=black,"
                           f"format=yuv420p,setpts=PTS-STARTPTS[av{k}]")
@@ -347,7 +350,7 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
             fc[-1] = fc[-1].replace(f"setpts=PTS-STARTPTS[av{k}]", f"setpts=(PTS-STARTPTS)/{spd}[av{k}]")
         if spd != 1.0 and f"setpts=(PTS-STARTPTS)/{spd}[av{k}]" not in fc[-1]:
             fc[-1] = fc[-1].replace(f"setpts=PTS-STARTPTS[av{k}]", f"setpts=(PTS-STARTPTS)/{spd}[av{k}]")
-        fd = min(0.012, seg["dur"] / 4)  # micro-fades: no clicks at cut points
+        fd = min(0.035, seg["dur"] / 4)  # 35 ms fades: no clicks and no jumping room tone at cuts
         rng = []  # quiet.py: muted pauses (source time) that fall in this piece
         for m in mutes:
             if Path(m["src"]).name == Path(str(spec["sources"][seg["src"]])).name:
