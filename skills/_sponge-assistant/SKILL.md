@@ -14,7 +14,7 @@ Read just the matching `roles/<role>/role.md` (in this skill's folder). Don't op
 
 | Role | Open | When the person says |
 |---|---|---|
-| Монтаж | `roles/montazh/role.md` | «собери/смонтируй рилс», «монтаж», «скилл грин», drops videos |
+| Монтаж (+ Логист: логика текста, длина) | `roles/montazh/role.md` | «собери/смонтируй рилс», «монтаж», «скилл грин», «логист», «сократи до минуты», drops videos |
 | Студия | `roles/studio/role.md` | «шаблон студия», «вырежи меня на фон», «с карточками» |
 | Губка (вкус) | `roles/gubka/role.md` | «губка», «в таком стиле», «разбери референс», «запомни мой вкус», 5-10 references |
 | Дизайнер | `roles/dizainer/role.md` | «карусель», «сторис», «пост», «дизайнер», «слайды» |
