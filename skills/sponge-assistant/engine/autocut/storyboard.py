@@ -104,7 +104,7 @@ def plan_text(job: Path) -> str:
         ts = [out_time(w) for w in s]
         txt = " ".join(w["text"] for w in s)
         if any(x is not None for x in ts):
-            txt = " ".join(w["text"] + ("(?)" if w.get("prob", 1) < 0.45 else "")
+            txt = " ".join(w["text"] + ("(?)" if w.get("prob", 1) < 0.45 and len(_norm(w["text"])) >= 4 else "")
                            for w, x in zip(s, ts) if x is not None).replace(" -", "-")
             kw = [(w, x) for w, x in zip(s, ts) if x is not None]
             end = kw[-1][1] + (kw[-1][0]["end"] - kw[-1][0]["start"]) / 2
@@ -140,26 +140,38 @@ def plan_text(job: Path) -> str:
                 kept_word_starts.add(round(w["start"], 2))
     LEAN = {"но", "а", "и", "это", "этот", "эта", "эти", "тогда", "поэтому", "потому", "ну", "вот", "так",
             "значит", "тоже", "также", "причем", "кстати", "однако", "dar", "si", "deci", "asta", "but", "and",
-            "so", "this", "that", "then"}
+            "so", "this", "that", "then", "конечно", "соответственно", "видите", "потом", "затем", "еще", "кроме",
+            "тем", "именно", "причем", "зато", "поэтому", "отсюда"}
 
-    def leans(w0: dict, txt: str) -> str | None:
+    def leans(w0: dict, txt: str) -> tuple[str, str] | None:
+        """(first words, the removed sentence it leans on) or None."""
         first = _norm(txt).split()[:2]
         if not first:
             return None
-        if not (first[0] in LEAN or first == ["не", "знаю"]):
+        lower_start = txt.strip()[:1].islower()  # a sentence fragment: its start was cut away
+        if not (first[0] in LEAN or first == ["не", "знаю"] or lower_start):
             return None
         r = next((k for k, rs in enumerate(raw_sents) if any(abs(x["start"] - w0["start"]) < 0.02 for x in rs)), None)
         if r is None or r == 0:
             return None
         prev_kept = any(round(x["start"], 2) in kept_word_starts for x in raw_sents[r - 1])
-        return None if prev_kept else " ".join(txt.split()[:2]).strip(",.")
-    lines.append("Остаётся (слово(?) = модель не уверена; ⚠ = опирается на убранную фразу):")
+        if prev_kept:
+            return None
+        prev = " ".join(x["text"] for x in raw_sents[r - 1]).split()
+        k = r - 2  # a very short removed sentence («Не знаю.») says little: add the one before it
+        while len(prev) < 6 and k >= 0 and not any(round(x["start"], 2) in kept_word_starts for x in raw_sents[k]):
+            prev = " ".join(x["text"] for x in raw_sents[k]).split() + prev
+            k -= 1
+        prev_txt = ("… " if len(prev) > 12 else "") + " ".join(prev[-12:])
+        return " ".join(txt.split()[:2]).strip(",."), prev_txt
+    lines.append("Остаётся (слово(?) = модель не уверена; ⚠ = фраза продолжает мысль, которую вырезали):")
     for i, (t0, txt, t1, w0) in enumerate(kept, 1):
         nxt = kept[i][0] if i < len(kept) else spec["duration"]
         here = [b for b in ins if t0 - 0.05 <= b["start"] < nxt]
         tag = "".join(f"  [вставка {Path(spec['sources'][b['src']]).name} {b['dur']:.0f} с]" for b in here)
         lean = leans(w0, txt)
-        warn = f"  ⚠ начинается с «{lean}», а фраза перед ней убрана" if lean else ""
+        warn = (f"  ⚠ продолжает вырезанную мысль: «{lean[1]}». Без неё непонятно, к чему «{lean[0]}». "
+                f"Верни ту фразу или срежь «{lean[0]}»") if lean else ""
         lines.append(f"{i}. {t0 / sp:4.1f} с ({max(0.3, t1 - t0) / sp:.1f} с)  {txt}{tag}{warn}")
     if cut:
         lines.append("Вырезано (повторы, оговорки):")
