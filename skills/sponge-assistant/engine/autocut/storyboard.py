@@ -74,6 +74,30 @@ def trim_words(words: list[dict], trims: list[str]) -> list[dict]:
     return words
 
 
+FILLERS = {"ну", "вот", "типа", "короче", "э", "ээ", "эээ", "эм", "мм", "ммм", "хм", "um", "uh", "eh", "deci", "păi"}
+
+
+def trim_fillers(words: list[dict], gap: float = 0.18) -> tuple[list[dict], list[str]]:
+    """Filler words standing on their own («ну,» … pause … «вот,» … pause) go; the same word inside a
+    phrase («вот эти приоритеты», «ну и что») stays. Alone = a pause (or a sentence start) before it AND
+    a pause after it. The cut lands in those pauses (cut flag), so nothing around is clipped."""
+    out, gone = [], []
+    for i, w in enumerate(words):
+        n = _norm(w["text"])
+        if n in FILLERS:
+            before = i == 0 or w["start"] - words[i - 1]["end"] >= gap or END.search(words[i - 1]["text"].strip())
+            after = i + 1 < len(words) and (words[i + 1]["start"] - w["end"] >= gap)
+            if before and after:
+                gone.append(n)
+                if i + 1 < len(words):
+                    words[i + 1] = dict(words[i + 1], cut=True)
+                    if (i == 0 or END.search(words[i - 1]["text"].strip())) and words[i + 1]["text"][:1].islower():
+                        words[i + 1]["text"] = words[i + 1]["text"][:1].upper() + words[i + 1]["text"][1:]
+                continue
+        out.append(dict(w))
+    return out, gone
+
+
 def plan_text(job: Path) -> str:
     spec = json.loads((job / "spec.json").read_text())
     words = json.loads((job / "words.json").read_text())
@@ -131,6 +155,13 @@ def plan_text(job: Path) -> str:
         if over > 2 and sp == 1:
             head += f" (или ускорить: ×1.1 даст {dur / 1.1:.0f} с)"
     lines.append(head + ".")
+    ff = job / "fillers.json"
+    if ff.exists():
+        gone = json.loads(ff.read_text())
+        if gone:
+            from collections import Counter
+            lines.append("Паразиты вырезаны (стояли отдельно): " + ", ".join(f"«{k}» ×{v}" for k, v in Counter(gone).most_common())
+                         + ". Вернуть: --keep-fillers.")
     # a kept sentence that leans on a removed one («Но…», «Это…», «Не знаю, но…») breaks the logic
     raw_sents = sentences(raw_words)
     kept_word_starts = set()
