@@ -160,6 +160,10 @@ def main() -> None:
     so.add_argument("--capcut", help="also write a layered CapCut project with this name")
     so.add_argument("--capcut-root"); so.add_argument("--media-dir"); so.add_argument("--map", nargs="*", default=[])
     sub.add_parser("studio-help", help="scene types for scenes.json")
+    sh = sub.add_parser("sheet", help="storyboard PNG of the plan for the person (sheet.py)")
+    sh.add_argument("job")
+    qt = sub.add_parser("quiet", help="mute mouth noise in the pause at a named moment (quiet.py)")
+    qt.add_argument("spec"); qt.add_argument("times", nargs="*"); qt.add_argument("--clear", action="store_true")
     lk = sub.add_parser("look", help="caption look preset + punch-in zoom (look.py)")
     lk.add_argument("spec"); lk.add_argument("--captions", choices=["minimal", "bold", "box", "words"])
     lk.add_argument("--size", type=int); lk.add_argument("--y", type=float); lk.add_argument("--font")
@@ -368,6 +372,12 @@ def main() -> None:
             r.update(capcut(job, Path(a.scenes), a.capcut, root, Path(a.media_dir) if a.media_dir else job / "studio" / "capcut_media",
                             Path(a.video) if a.video else None, a.map))
         print(r["plan"] if a.plan else json.dumps(r, ensure_ascii=False))
+    elif a.cmd == "sheet":
+        from .sheet import sheet
+        print(json.dumps({"sheet": sheet(a.job)}, ensure_ascii=False))
+    elif a.cmd == "quiet":
+        from .quiet import quiet
+        print(json.dumps(quiet(a.spec, a.times, a.clear), ensure_ascii=False))
     elif a.cmd == "look":
         from .look import look
         print(json.dumps(look(a.spec, a.captions, a.size, a.y, a.font, a.upper, a.color, a.highlight, a.anim,

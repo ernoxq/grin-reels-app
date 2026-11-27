@@ -139,36 +139,39 @@ def _speech_mask(d: np.ndarray, thr: float) -> np.ndarray:
     return m
 
 
-def clicks(d: np.ndarray, s: float, e: float, thr: float) -> list[tuple[float, float]]:
-    """Lip smacks / clicks inside the pauses of a kept piece: bursts <= 50 ms, >= 15 dB over the
-    pause, inside >= 300 ms without voice, >= 0.1 s away from words. Seconds relative to the piece start, to be ducked."""
+def clicks(d: np.ndarray, s: float, e: float) -> list[tuple[float, float]]:
+    """Mouth noise between words (цоканье, чмоки, вдохи): inside a kept piece find real pauses —
+    >= 250 ms with no sound of speech level lasting >= 60 ms (words always have such runs; clicks and
+    smacks are shorter or quieter) — and duck their inside, leaving 50 ms at both edges so word tails
+    and attacks stay. Seconds relative to the piece start."""
     a, b = max(0, int(s * 100)), min(len(d), int(e * 100))
     seg = d[a:b]
-    if len(seg) < 12:
+    if len(seg) < 30:
         return []
-    voice = _speech_mask(seg, thr)
+    loud = float(np.percentile(seg, 95)) - 20  # speech level for this piece
+    up = seg > loud
+    word = np.zeros(len(seg), bool)
+    i = 0
+    while i < len(seg):
+        if up[i]:
+            j = i
+            while j < len(seg) and up[j]:
+                j += 1
+            if j - i >= 6:
+                word[i:j] = True
+            i = j
+        else:
+            i += 1
     out, i = [], 0
     while i < len(seg):
-        if voice[i]:
+        if word[i]:
             i += 1
             continue
         j = i
-        while j < len(seg) and not voice[j]:
+        while j < len(seg) and not word[j]:
             j += 1
-        if j - i >= 30:  # a real pause (>= 300 ms); stop-consonant closures inside words are shorter
-            q = seg[i:j]
-            floor = float(np.percentile(q, 30))
-            k = 0
-            while k < len(q):
-                if q[k] > floor + 15:
-                    m = k
-                    while m < len(q) and q[m] > floor + 8:
-                        m += 1
-                    # a burst right before a word is its consonant (к, т, п), right after one its tail: keep
-                    if m - k <= 5 and k >= 8 and len(q) - m >= 10:
-                        out.append((round(max(0.0, (i + k) / 100 - 0.01), 3), round((i + m) / 100 + 0.02, 3)))
-                    k = m
-                k += 1
+        if j - i >= 25 and i > 0 and j < len(seg):  # a pause between two words of this piece
+            out.append((round((i + 5) / 100, 3), round((j - 5) / 100, 3)))
         i = j
     return out
 
@@ -200,7 +203,7 @@ def snap_voice(spec: dict, src_path) -> dict:
             e2 = min(e2, voice[k + 1]["in"])
         if e2 - s2 > 0.1:
             seg["in"], seg["dur"] = round(max(0.0, s2), 4), round(e2 - max(0.0, s2), 4)
-        seg["duck"] = clicks(d, seg["in"], seg["in"] + seg["dur"], thr)
+        seg.pop("duck", None)  # mouth noise is muted only where the person points (quiet.py): auto rules ate soft syllables
 
     new, t = [], 0.0
     for seg in voice:

@@ -313,6 +313,8 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
     cx = int((sw - W) / 2 - ax * W / 2)
     cy = int((sh - H) / 2 + ay * H / 2)
     vlabels, alabels = [], []
+    mf = Path(spec["_base"]) / "mute.json"
+    mutes = json.loads(mf.read_text()) if mf.exists() else []
     from .audioclean import clean
     vsrc = {}  # talking clips with cleaned voice (denoise + -14 LUFS), cached in the job folder
     for key in {seg["src"] for seg in spec["voice"]}:
@@ -346,7 +348,13 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
         if spd != 1.0 and f"setpts=(PTS-STARTPTS)/{spd}[av{k}]" not in fc[-1]:
             fc[-1] = fc[-1].replace(f"setpts=PTS-STARTPTS[av{k}]", f"setpts=(PTS-STARTPTS)/{spd}[av{k}]")
         fd = min(0.012, seg["dur"] / 4)  # micro-fades: no clicks at cut points
-        duck = "".join(f",volume=0.08:enable='between(t,{a:.3f},{b:.3f})'" for a, b in seg.get("duck") or [])
+        rng = []  # quiet.py: muted pauses (source time) that fall in this piece
+        for m in mutes:
+            if Path(m["src"]).name == Path(str(spec["sources"][seg["src"]])).name:
+                a, b = max(m["from"], seg["in"]) - seg["in"], min(m["to"], seg["in"] + seg["dur"]) - seg["in"]
+                if b - a > 0.02:
+                    rng.append((a, b))
+        duck = "".join(f",volume=0.03:enable='between(t,{a:.3f},{b:.3f})'" for a, b in rng)
         fc.append(f"[{i}:a]aresample=48000,asetpts=PTS-STARTPTS{duck},afade=t=in:d={fd:.3f},"
                   f"afade=t=out:st={seg['dur'] - fd:.4f}:d={fd:.3f}{f',atempo={spd}' if spd != 1.0 else ''}[aa{k}]")
         vlabels.append(f"[av{k}]")

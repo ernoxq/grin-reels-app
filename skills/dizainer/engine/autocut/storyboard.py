@@ -160,7 +160,7 @@ def plan_text(job: Path) -> str:
         tag = "".join(f"  [вставка {Path(spec['sources'][b['src']]).name} {b['dur']:.0f} с]" for b in here)
         lean = leans(w0, txt)
         warn = f"  ⚠ начинается с «{lean}», а фраза перед ней убрана" if lean else ""
-        lines.append(f"{i}. {t0:4.1f} с ({max(0.3, t1 - t0) / sp:.1f} с)  {txt}{tag}{warn}")
+        lines.append(f"{i}. {t0 / sp:4.1f} с ({max(0.3, t1 - t0) / sp:.1f} с)  {txt}{tag}{warn}")
     if cut:
         lines.append("Вырезано (повторы, оговорки):")
         lines += [f"- {c[:90]}" for c in cut]
