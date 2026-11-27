@@ -321,6 +321,9 @@ def main() -> None:
             _split(spec_path, parts)
         from .look import auto_frame
         auto_frame(spec_path)  # horizontal video -> whole frame visible, captions under it
+        if (a.out / "look.json").exists():  # the look chosen earlier for this job survives re-plans
+            from .look import look as _look
+            _look(str(spec_path), _save=False, **json.loads((a.out / "look.json").read_text()))
         (a.out / "auto_args.json").write_text(json.dumps(args, ensure_ascii=False))
         if a.plan:
             from .storyboard import plan_text

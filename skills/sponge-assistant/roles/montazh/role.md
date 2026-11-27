@@ -35,7 +35,7 @@ First run: pass `--vocab "names, brands, terms"` you already know (their name, b
 
 **Shortening («на минуту», «короче»): logic first, seconds second.** Keep an arc: hook (what this is about) → the point → conclusion. Prefer dropping repeats, side stories and filler over the point or the ending. Never keep a line marked ⚠ (it continues a thought that was cut: «Но…», «Это…», «Не знаю, но…», a lowercase fragment); the plan quotes the removed sentence it needs. Fix with `--keep "<that sentence>"` or `--trim "[Но] …"`, or drop the line too. Use the per-line seconds in the plan to choose ALL cuts at once (one re-plan, not trial and error). Over target by <15 % → suggest `look --speed 1.1` instead of cutting meaning.
 
-**Agree before building (one short message, then wait):** after the proofread plan run `python -m autocut sheet jobs/r1` and send `jobs/r1/storyboard.png` (the storyboard: a frame, time and words per line, ⚠ in red, cuts in grey) WITHOUT opening it yourself, with the brief below:
+**Agree before building (one short message, then STOP and wait — never render in the same turn):** after the proofread plan, apply the look they asked for (`look …`: remembered for this job, survives re-plans), then run `python -m autocut sheet jobs/r1` and send `jobs/r1/storyboard.png` WITHOUT opening it yourself (left: every line with a frame, time, words, unsure words in yellow, cut-off thoughts in red with the cut sentence quoted; right: a real frame in the final look with captions in their font/size/place, the look settings, what is cut with its source time), with the brief below:
 «План (≈N с):
 1. Хук: «…»
 2. Суть: «…» → «…»

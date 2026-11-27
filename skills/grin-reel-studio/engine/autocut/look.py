@@ -44,9 +44,20 @@ PRESETS = {
 
 def look(spec_path: str, captions=None, size=None, y=None, font=None, upper=None, color=None,
          highlight=None, anim=None, punch=None, frame=None, music=None, music_db=None, speed=None,
-         voice_audio=None) -> dict:
+         voice_audio=None, _save=True) -> dict:
     sp = Path(spec_path)
     spec = json.loads(sp.read_text())
+    if _save:  # remembered for this job: re-plans rebuild spec.json, the look comes back (and shows on the storyboard)
+        lf = sp.parent / "look.json"
+        saved = json.loads(lf.read_text()) if lf.exists() else {}
+        new = dict(captions=captions, size=size, y=y, font=font, upper=upper, color=color, highlight=highlight,
+                   anim=anim, punch=punch, frame=frame, music=music, music_db=music_db, speed=speed,
+                   voice_audio=voice_audio)
+        if captions:  # a preset replaces earlier single tweaks of the captions
+            for k in ("size", "font", "upper", "color", "highlight", "anim"):
+                saved.pop(k, None)
+        saved.update({k: v for k, v in new.items() if v is not None})
+        lf.write_text(json.dumps(saved, ensure_ascii=False))
     cs = spec["caption_style"]
     if captions:
         cs.update(PRESETS[captions])
@@ -121,6 +132,6 @@ def auto_frame(spec_path) -> str | None:
     if abs(int(float(vals.get("rotation", 0) or 0))) in (90, 270):
         w, h = h, w
     if w > h * 1.1:
-        look(str(sp), frame="fit")
+        look(str(sp), frame="fit", _save=False)
         return "fit"
     return None

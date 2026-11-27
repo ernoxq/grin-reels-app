@@ -104,7 +104,7 @@ def plan_text(job: Path) -> str:
         ts = [out_time(w) for w in s]
         txt = " ".join(w["text"] for w in s)
         if any(x is not None for x in ts):
-            txt = " ".join(w["text"] + ("(?)" if w.get("prob", 1) < 0.45 else "")
+            txt = " ".join(w["text"] + ("(?)" if w.get("prob", 1) < 0.45 and len(_norm(w["text"])) >= 4 else "")
                            for w, x in zip(s, ts) if x is not None).replace(" -", "-")
             kw = [(w, x) for w, x in zip(s, ts) if x is not None]
             end = kw[-1][1] + (kw[-1][0]["end"] - kw[-1][0]["start"]) / 2
