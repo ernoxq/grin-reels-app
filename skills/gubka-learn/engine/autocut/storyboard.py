@@ -164,13 +164,14 @@ def plan_text(job: Path) -> str:
             k -= 1
         prev_txt = ("… " if len(prev) > 12 else "") + " ".join(prev[-12:])
         return " ".join(txt.split()[:2]).strip(",."), prev_txt
-    lines.append("Остаётся (слово(?) = модель не уверена; ⚠ = опирается на убранную фразу):")
+    lines.append("Остаётся (слово(?) = модель не уверена; ⚠ = фраза продолжает мысль, которую вырезали):")
     for i, (t0, txt, t1, w0) in enumerate(kept, 1):
         nxt = kept[i][0] if i < len(kept) else spec["duration"]
         here = [b for b in ins if t0 - 0.05 <= b["start"] < nxt]
         tag = "".join(f"  [вставка {Path(spec['sources'][b['src']]).name} {b['dur']:.0f} с]" for b in here)
         lean = leans(w0, txt)
-        warn = f"  ⚠ начинается с «{lean[0]}», а опирается на убранную фразу: «{lean[1]}»" if lean else ""
+        warn = (f"  ⚠ продолжает вырезанную мысль: «{lean[1]}». Без неё непонятно, к чему «{lean[0]}». "
+                f"Верни ту фразу или срежь «{lean[0]}»") if lean else ""
         lines.append(f"{i}. {t0 / sp:4.1f} с ({max(0.3, t1 - t0) / sp:.1f} с)  {txt}{tag}{warn}")
     if cut:
         lines.append("Вырезано (повторы, оговорки):")
