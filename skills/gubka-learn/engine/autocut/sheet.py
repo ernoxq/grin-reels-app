@@ -68,7 +68,8 @@ def sheet(job: str) -> str:
             mode = "c"; continue
         if mode == "k" and m:
             body = m.group(4)
-            warn = "⚠" in body
+            wm = re.search(r"опирается на убранную фразу: «(.*)»", body)
+            warn = wm.group(1) if wm else ("" if "⚠" not in body else "?")
             body = re.sub(r"\s+⚠.*$", "", body).replace("(?)", "")
             body = re.sub(r"\s+\[вставка[^\]]*\]", "", body)
             kept.append((float(m.group(2)), m.group(3), body, warn))
@@ -92,17 +93,20 @@ def sheet(job: str) -> str:
         subprocess.run([FFMPEG, "-v", "error", "-y", "-ss", f"{max(0, st):.2f}", "-i", src, "-frames:v", "1",
                         "-vf", f"scale={tw}:{TH}:force_original_aspect_ratio=increase,crop={tw}:{TH}", str(tmp)])
         lines = _wrap(dr, body, f_t, W - 3 * PAD - tw)
-        hgt = max(TH, 40 + len(lines) * 36) + 20
+        wl = _wrap(dr, f"Опирается на убранную: «{warn}»", f_m, W - 3 * PAD - tw) if warn else []
+        hgt = max(TH, 40 + len(lines) * 36 + len(wl) * 28) + 20
         if tmp.exists():
             img.paste(Image.open(tmp).convert("RGB"), (PAD, y))
         x = PAD * 2 + tw
         meta = f"{i}.  {t0:.0f} с" + (f"  ·  {dur} с" if dur else "")
         dr.text((x, y), meta, font=f_m, fill="#FF6B6B" if warn else "#8FD3FF")
         if warn:
-            dr.text((x + dr.textlength(meta, font=f_m) + 16, y), "⚠ опирается на убранную фразу", font=f_m, fill="#FF6B6B")
+            dr.text((x + dr.textlength(meta, font=f_m) + 16, y), "! висит без опоры", font=f_m, fill="#FF6B6B")
         yy = y + 34
         for l in lines:
             dr.text((x, yy), l, font=f_t, fill="#FF9A9A" if warn else "white"); yy += 36
+        for l in wl:
+            dr.text((x, yy), l, font=f_m, fill="#FF6B6B"); yy += 28
         y += hgt
         dr.line((PAD, y - 10, W - PAD, y - 10), fill="#2A2A2A", width=2)
     args = json.loads((job / "auto_args.json").read_text()) if (job / "auto_args.json").exists() else {}
