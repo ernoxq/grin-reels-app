@@ -40,6 +40,40 @@ def drop_phrases(words: list[dict], phrases: list[str]) -> list[dict]:
     return keep
 
 
+def trim_words(words: list[dict], trims: list[str]) -> list[dict]:
+    """--trim "[Но] пока что" / "вот [этот] весь": remove only the bracketed words, only where the
+    whole phrase is said (first match). The next kept word gets cut=True, so the voice is cut there."""
+    words = [dict(w) for w in words]
+    for spec in trims:
+        toks = re.findall(r"\[[^\]]+\]|[^\s\[\]]+", spec)
+        ctx, drop = [], []
+        for t in toks:
+            if t.startswith("["):
+                for x in t[1:-1].split():
+                    if _norm(x):
+                        ctx.append(_norm(x)); drop.append(True)
+            elif _norm(t):
+                ctx.append(_norm(t)); drop.append(False)
+        if not ctx or not any(drop):
+            continue
+        norm = [_norm(w["text"]) for w in words]
+        for i in range(len(words) - len(ctx) + 1):
+            if all(norm[i + j] == ctx[j] for j in range(len(ctx))):
+                rm = [i + j for j in range(len(ctx)) if drop[j]]
+                after = max(rm) + 1
+                if after < len(words):
+                    words[after]["cut"] = True
+                    first = min(rm)  # a removed sentence start: the next word starts the sentence
+                    if first == 0 or END.search(words[first - 1]["text"].strip()):
+                        words[after]["text"] = words[after]["text"][:1].upper() + words[after]["text"][1:]
+                if rm and END.search(words[max(rm)]["text"].strip()) and min(rm) > 0:
+                    words[min(rm) - 1]["text"] = words[min(rm) - 1]["text"].rstrip(",;:") + "."
+                for k in sorted(rm, reverse=True):
+                    del words[k]
+                break
+    return words
+
+
 def plan_text(job: Path) -> str:
     spec = json.loads((job / "spec.json").read_text())
     words = json.loads((job / "words.json").read_text())
@@ -72,7 +106,9 @@ def plan_text(job: Path) -> str:
         if any(x is not None for x in ts):
             txt = " ".join(w["text"] + ("(?)" if w.get("prob", 1) < 0.45 else "")
                            for w, x in zip(s, ts) if x is not None).replace(" -", "-")
-            kept.append((min(x for x in ts if x is not None), txt))
+            kw = [(w, x) for w, x in zip(s, ts) if x is not None]
+            end = kw[-1][1] + (kw[-1][0]["end"] - kw[-1][0]["start"]) / 2
+            kept.append((min(x for x in ts if x is not None), txt, end, s[0]))
         else:
             cut.append(txt)
     args = json.loads((job / "auto_args.json").read_text()) if (job / "auto_args.json").exists() else {}
@@ -84,12 +120,47 @@ def plan_text(job: Path) -> str:
             lines.append("Вставки: " + ", ".join(f"{Path(spec['sources'][b['src']]).name} на {b['start']:.0f} с"
                                                  for b in sorted(spec["broll"], key=lambda b: b["start"])))
         return "\n".join(lines)
-    lines.append("Остаётся (слово(?) = модель не уверена, проверь его):")
-    for i, (t0, txt) in enumerate(kept, 1):
+    # length vs target (and speed), so cuts can be chosen in ONE re-plan
+    sp = float(spec.get("speed") or 1.0)
+    dur = spec["duration"] / sp
+    tgt = args.get("target")
+    head = f"Сейчас {dur:.0f} с" + (f" (с ускорением ×{sp:g})" if sp != 1 else "")
+    if tgt:
+        over = dur - tgt
+        head += (f", цель {tgt:.0f} с: убрать ещё ~{over:.0f} с" if over > 2 else f", цель {tgt:.0f} с: укладываемся")
+        if over > 2 and sp == 1:
+            head += f" (или ускорить: ×1.1 даст {dur / 1.1:.0f} с)"
+    lines.append(head + ".")
+    # a kept sentence that leans on a removed one («Но…», «Это…», «Не знаю, но…») breaks the logic
+    raw_sents = sentences(raw_words)
+    kept_word_starts = set()
+    for sx in sentences(words):
+        for w in sx:
+            if out_time(w) is not None:
+                kept_word_starts.add(round(w["start"], 2))
+    LEAN = {"но", "а", "и", "это", "этот", "эта", "эти", "тогда", "поэтому", "потому", "ну", "вот", "так",
+            "значит", "тоже", "также", "причем", "кстати", "однако", "dar", "si", "deci", "asta", "but", "and",
+            "so", "this", "that", "then"}
+
+    def leans(w0: dict, txt: str) -> str | None:
+        first = _norm(txt).split()[:2]
+        if not first:
+            return None
+        if not (first[0] in LEAN or first == ["не", "знаю"]):
+            return None
+        r = next((k for k, rs in enumerate(raw_sents) if any(abs(x["start"] - w0["start"]) < 0.02 for x in rs)), None)
+        if r is None or r == 0:
+            return None
+        prev_kept = any(round(x["start"], 2) in kept_word_starts for x in raw_sents[r - 1])
+        return None if prev_kept else " ".join(txt.split()[:2]).strip(",.")
+    lines.append("Остаётся (слово(?) = модель не уверена; ⚠ = опирается на убранную фразу):")
+    for i, (t0, txt, t1, w0) in enumerate(kept, 1):
         nxt = kept[i][0] if i < len(kept) else spec["duration"]
         here = [b for b in ins if t0 - 0.05 <= b["start"] < nxt]
         tag = "".join(f"  [вставка {Path(spec['sources'][b['src']]).name} {b['dur']:.0f} с]" for b in here)
-        lines.append(f"{i}. {t0:4.1f} с  {txt}{tag}")
+        lean = leans(w0, txt)
+        warn = f"  ⚠ начинается с «{lean}», а фраза перед ней убрана" if lean else ""
+        lines.append(f"{i}. {t0 / sp:4.1f} с ({max(0.3, t1 - t0) / sp:.1f} с)  {txt}{tag}{warn}")
     if cut:
         lines.append("Вырезано (повторы, оговорки):")
         lines += [f"- {c[:90]}" for c in cut]

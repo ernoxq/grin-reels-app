@@ -31,7 +31,20 @@ nohup bash grin/run.sh <ALL attached videos and photos, absolute paths> --plan -
 Wait cheaply: `sleep 120; tail -25 grin/out.txt` until the plan appears (~1.5 min per minute of raw video).
 **Captions must be CapCut-level or better: proofread every plan before showing it.** Read the whole text once like an editor: misheard words («к Лоду»→«Клоду», «клад»→«Клод», «Терраспалета не обойдет с стороной»→«Тирасполь это не обойдёт стороной»), names and brands, case endings, numbers. Fix ALL of them in one `--fix "wrong=right" ...` re-plan (several words → any number of words, timing is kept); you know the language and the meaning, Whisper doesn't. Never paraphrase what they said, only what was misheard. Drop clear stumbles/repeats with `--drop`.
 First run: pass `--vocab "names, brands, terms"` you already know (their name, brand, city, Claude/CapCut...; folder mode: the contents of `Вкус/словарь.txt` if it exists). When they correct a word, offer once to add it to `Вкус/словарь.txt`.
-- `--drop "фраза"` (undo `--keep`), `--title "..."`; same `--out` remembers earlier choices; a new reel gets a new `--out`.
+- `--drop "фраза"` (undo `--keep`), `--trim "[Но] пока что"` (removes only the bracketed words, cut in place; undo `--untrim`; a word said fused with its neighbours, with no gap, may stay audible: prefer trimming at sentence starts and after pauses), `--target 60` (plan shows how much to cut), `--title "..."`; same `--out` remembers earlier choices; a new reel gets a new `--out`.
+
+**Shortening («на минуту», «короче»): logic first, seconds second.** Keep an arc: hook (what this is about) → the point → conclusion. Prefer dropping repeats, side stories and filler over the point or the ending. Never keep a line marked ⚠ (it leans on a removed one: «Но…», «Это…», «Не знаю, но…») without the line it needs; fix with `--keep` of that line or `--trim "[Но] …"`. Use the per-line seconds in the plan to choose ALL cuts at once (one re-plan, not trial and error). Over target by <15 % → suggest `look --speed 1.1` instead of cutting meaning.
+
+**Agree before building (one short message, then wait):** after the proofread plan run `python -m autocut sheet jobs/r1` and send `jobs/r1/storyboard.png` (the storyboard: a frame, time and words per line, ⚠ in red, cuts in grey) WITHOUT opening it yourself, with the brief below:
+«План (≈N с):
+1. Хук: «…»
+2. Суть: «…» → «…»
+3. Вывод: «…»
+Убираю: <2–4 words per removed part>. Вид: <субтитры / кадр / музыка / скорость — only what they asked or the defaults>.
+Собираю так?»
+Build only after a yes or edits.
+
+**«цоканье / чмок / щелчок / вдох на 0:09»** → `python -m autocut quiet jobs/r1/spec.json 0:09 [1:16 …]`, then render. It mutes only the pause between words at that moment (the engine does not guess mouth noise on its own: it sounds like soft syllables). Reply says `muted_sec: 0` → that moment is inside a word; tell them. Skip the brief only if they said «сразу» / «без плана» or they already approved this plan.
 - photo / video / icon on certain words: `place` (reference.md E); animated text: reference.md J.
 Render: `cd grin && nohup python -m autocut finish jobs/r1 > out.txt 2>&1 &`, poll, read the JSON line.
 «сразу» / «без плана» → skip `--plan`.
@@ -45,8 +58,8 @@ No LUT or «cinematic look» unless asked. Asked for a look: one preset at 40-70
 ## 4. Any other wish
 Content (what stays, order, words, title) → plan flags. Something on screen at certain words → `place`. Fonts, colours, music, captions → reference.md D. Their vibe from 1-5 reels → `gubka-learn`. Studio format → `grin-reel-studio`. Link to a reference → reference.md J. Anything else → one small ffmpeg step on `final.mp4`.
 
-**Caption look + punch-in (one command, then render):** `python -m autocut look jobs/r1/spec.json --captions minimal|bold|box|words [--size 58] [--y -0.4] [--font "Montserrat Medium|SemiBold|Bold|Black, Inter …, Oswald"] [--upper|--no-upper] [--color "#FFFFFF"] [--highlight "#F6DB92"] [--anim rise|pop|fade] [--punch 1.06]`. «аккуратные/минималистичные субтитры» → `minimal`; «крупные» → `bold`; «слово подсвечивается» → `words`; «на плашке» → `box`; «зум на склейках / динамичнее» → `--punch 1.06` (1.10 strong).
-Same command: `--frame fill|fit|blur` (horizontal video gets `blur` automatically: whole frame, captions under it; «как на скрине, чёрный фон» → `fit`; «на весь экран» → `fill`), `--music FILE --music-db -20` («тихонько» −20, «фоном» −16; looped and faded by the engine).
+**Caption look + punch-in (one command, then render):** `python -m autocut look jobs/r1/spec.json --captions minimal|bold|box|words [--size 58] [--y -0.4] [--font "Montserrat Medium|SemiBold|Bold|Black, Inter …, Oswald"] [--upper|--no-upper] [--color "#FFFFFF"] [--highlight "#F6DB92"] [--anim rise|pop|fade] [--punch 1.06] [--speed 1.1]`. «аккуратные/минималистичные субтитры» → `minimal`; «крупные» → `bold`; «слово подсвечивается» → `words`; «на плашке» → `box`; «зум на склейках / динамичнее» → `--punch 1.06` (1.10 strong).
+Same command: `--frame fill|fit|blur` (horizontal video gets `fit` automatically: whole frame on black, captions under it; «на весь экран» → `fill`; `blur` only if they ask for a blurred background), `--music FILE --music-db -20` («тихонько» −20, «фоном» −16; looped and faded by the engine).
 **A screenshot or reel of the wanted look attached → open it ONCE before the first render** and translate it into `look`/`scene` flags (layout, caption size, position, case, animation). Never render first and compare afterwards.
 
 **Designer scenes (default for talking-head reels over 20 s, unless they say «просто»):** from the plan, pick 2–3 moments: a strong claim → `card`, an enumeration → `split`. Never in the first 1.5 s; ~1 scene per 10 s; key = 2–4 words that carry the meaning.

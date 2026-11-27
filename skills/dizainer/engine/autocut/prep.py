@@ -189,7 +189,12 @@ def split_voice(spec: dict, parts: list[dict]) -> dict:
                 left -= nxt[0]["start"] - a; a = nxt[0]["start"]
                 continue
             take = min(left, p["start"] + p["dur"] - a)
-            out.append({"src": keys[p["file"]], "in": round(a - p["start"], 4), "dur": round(take, 4)})
+            piece = {"src": keys[p["file"]], "in": round(a - p["start"], 4), "dur": round(take, 4)}
+            if seg.get("cut_in") and a == seg["in"]:
+                piece["cut_in"] = True
+            if seg.get("cut_out") and left - take <= 0.01:
+                piece["cut_out"] = True
+            out.append(piece)
             a += take; left -= take
     spec["voice"] = out
     return spec

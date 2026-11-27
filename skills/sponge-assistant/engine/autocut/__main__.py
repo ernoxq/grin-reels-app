@@ -122,6 +122,9 @@ def main() -> None:
     au.add_argument("--keep", nargs="*", default=[], help="undo an earlier --drop")
     au.add_argument("--fix", nargs="*", default=[], help='wrongly recognised words: "wrong=right" (kept between re-plans)')
     au.add_argument("--no-inserts", action="store_true", help="talking parts only, no B-roll")
+    au.add_argument("--trim", nargs="*", default=[], help='cut single words in place: "[Но] пока что", "вот [этот] весь" (kept between re-plans)')
+    au.add_argument("--untrim", nargs="*", default=[], help="undo an earlier --trim (same text)")
+    au.add_argument("--target", type=float, help="wanted length in seconds: the plan says how much to cut")
     au.add_argument("--vocab", help='names/brands/terms the speaker uses, comma-separated ("Claude, Кишинёв, Мария")')
 
     rd = sub.add_parser("render", help="render a reel spec.json (after hand edits)")
@@ -157,6 +160,10 @@ def main() -> None:
     so.add_argument("--capcut", help="also write a layered CapCut project with this name")
     so.add_argument("--capcut-root"); so.add_argument("--media-dir"); so.add_argument("--map", nargs="*", default=[])
     sub.add_parser("studio-help", help="scene types for scenes.json")
+    sh = sub.add_parser("sheet", help="storyboard PNG of the plan for the person (sheet.py)")
+    sh.add_argument("job")
+    qt = sub.add_parser("quiet", help="mute mouth noise in the pause at a named moment (quiet.py)")
+    qt.add_argument("spec"); qt.add_argument("times", nargs="*"); qt.add_argument("--clear", action="store_true")
     lk = sub.add_parser("look", help="caption look preset + punch-in zoom (look.py)")
     lk.add_argument("spec"); lk.add_argument("--captions", choices=["minimal", "bold", "box", "words"])
     lk.add_argument("--size", type=int); lk.add_argument("--y", type=float); lk.add_argument("--font")
@@ -165,6 +172,7 @@ def main() -> None:
     lk.add_argument("--color"); lk.add_argument("--highlight"); lk.add_argument("--anim", choices=["rise", "pop", "fade"])
     lk.add_argument("--punch", type=float)
     lk.add_argument("--frame", choices=["fill", "fit", "blur"]); lk.add_argument("--music"); lk.add_argument("--music-db", type=float)
+    lk.add_argument("--speed", type=float)
     sc = sub.add_parser("scene", help="speaker shrinks into a card / half screen, words typeset around (scenes.py)")
     sc.add_argument("spec"); sc.add_argument("kind", choices=["card", "split", "clear"])
     sc.add_argument("--from", dest="frm"); sc.add_argument("--to"); sc.add_argument("--key"); sc.add_argument("--list")
@@ -299,11 +307,14 @@ def main() -> None:
         args["drop"] = drops
         fixes = [f for f in prev.get("fix", []) if f.split("=")[0] not in {x.split("=")[0] for x in a.fix}] + a.fix
         args["fix"] = fixes
-        if drops or fixes:
+        trims = [t for t in prev.get("trim", []) if t not in a.untrim] + [t for t in a.trim if t not in prev.get("trim", [])]
+        args["trim"] = trims
+        args["target"] = a.target or prev.get("target")
+        if drops or fixes or trims:
             a.drop = drops
-            from .storyboard import drop_phrases, fix_words
+            from .storyboard import drop_phrases, fix_words, trim_words
             w = json.loads((a.out / "words.json").read_text())
-            (a.out / "words_edit.json").write_text(json.dumps(drop_phrases(fix_words(w, fixes), a.drop),
+            (a.out / "words_edit.json").write_text(json.dumps(drop_phrases(trim_words(fix_words(w, fixes), trims), a.drop),
                                                               ensure_ascii=False))
             spec_path = run(str(main), args["inserts"], args["style"], str(a.out), script=args["script"],
                             title=a.title, words_json=str(a.out / "words_edit.json"), language=a.lang)
@@ -315,7 +326,7 @@ def main() -> None:
             from .storyboard import plan_text
             txt = plan_text(a.out)
             (a.out / "plan.txt").write_text(txt)
-            print(txt + f"\nJOB: {a.out}")
+            print(txt + f"\nJOB: {a.out}\nSPEC: {a.out / 'spec.json'}")
             return
         print(json.dumps(_finish(a.out, t0), ensure_ascii=False))
     elif a.cmd == "fetch":
@@ -361,10 +372,16 @@ def main() -> None:
             r.update(capcut(job, Path(a.scenes), a.capcut, root, Path(a.media_dir) if a.media_dir else job / "studio" / "capcut_media",
                             Path(a.video) if a.video else None, a.map))
         print(r["plan"] if a.plan else json.dumps(r, ensure_ascii=False))
+    elif a.cmd == "sheet":
+        from .sheet import sheet
+        print(json.dumps({"sheet": sheet(a.job)}, ensure_ascii=False))
+    elif a.cmd == "quiet":
+        from .quiet import quiet
+        print(json.dumps(quiet(a.spec, a.times, a.clear), ensure_ascii=False))
     elif a.cmd == "look":
         from .look import look
         print(json.dumps(look(a.spec, a.captions, a.size, a.y, a.font, a.upper, a.color, a.highlight, a.anim,
-                              a.punch, a.frame, a.music, a.music_db), ensure_ascii=False))
+                              a.punch, a.frame, a.music, a.music_db, a.speed), ensure_ascii=False))
     elif a.cmd == "scene":
         from .scenes import scene
         print(json.dumps(scene(a.spec, a.kind, a.frm, a.to, a.key, a.list), ensure_ascii=False))

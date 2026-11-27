@@ -122,7 +122,9 @@ def select_takes(phrases: list[Phrase], script: list[str] | None = None, thr: fl
             retold = []  # opening question = the hook, keep it
         echo = len(p.words) <= 3 and cp | {w for w in p.norm.split()} and all(
             w in " ".join(q.norm for q in nxt[:2]) for w in p.norm.split())  # "ловить." then "...ловить яркие эмоции"
-        if restart or retold or junk(p) or echo:
+        trimmed_next = (i + 1 < len(phrases) and phrases[i + 1].words and phrases[i + 1].words[0].cut
+                        and not p.words[-1].text.strip().endswith((".", "!", "?", "…")))  # same sentence only
+        if (restart or retold or junk(p) or echo) and not trimmed_next:  # «Я» before trimmed words stays
             continue
         keep.append(p)
     return keep
@@ -158,9 +160,27 @@ def voice_segments(kept: list[Phrase], src_key: str, pad_in=0.08, pad_out=0.14, 
         while j + 1 < len(kept) and 0 <= kept[j + 1].start - kept[j].end <= max_pause:
             j += 1
             e0 = kept[j].end + pad_out
-        segs.append({"src": src_key, "in": round(s0, 4), "dur": round(e0 - s0, 4)})
-        mp.append((s0, e0, t))
-        t += e0 - s0
+        # trimmed words («--trim»): split the run there; the piece after starts exactly at the kept word
+        ws = [w for p in kept[i:j + 1] for w in p.words]
+        bounds, a = [], s0
+        for k in range(1, len(ws)):
+            if ws[k].cut:
+                bounds.append((a, ws[k - 1].end + pad_out, False))
+                a = ws[k].start - 0.02
+        bounds.append((a, e0, bool(bounds)))
+        for n, (x0, x1, after_cut) in enumerate(bounds):
+            if n:
+                x0 = max(x0, bounds[n - 1][1])
+            if x1 - x0 < 0.08:
+                continue
+            seg = {"src": src_key, "in": round(x0, 4), "dur": round(x1 - x0, 4)}
+            if n < len(bounds) - 1:
+                seg["cut_out"] = True  # trimmed words follow: never run on into them
+            if n or ws[0].cut:
+                seg["cut_in"] = True  # starts right after trimmed words: never look back into them
+            segs.append(seg)
+            mp.append((x0, x1, t))
+            t += x1 - x0
         if j + 1 < len(kept) and kept[j + 1].start - kept[j].end > max_pause:
             pass  # next run starts a new segment (pause removed down to pads)
         i = j + 1

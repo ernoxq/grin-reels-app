@@ -241,12 +241,42 @@ def write_ass(spec: dict, out: Path) -> Path:
     return out
 
 
+def _speed_timeline(spec: dict, spd: float) -> dict:
+    """Whole reel faster (×1.1 like CapCut): every output time /spd; voice pieces get setpts+atempo."""
+    import copy
+    sp = copy.deepcopy(spec)
+    sp["_sped"] = True
+
+    def walk(o):
+        if isinstance(o, dict):
+            for k, v in o.items():
+                if k in ("start", "end", "s", "e") and isinstance(v, (int, float)):
+                    o[k] = round(v / spd, 4)
+                else:
+                    walk(v)
+        elif isinstance(o, list):
+            for v in o:
+                walk(v)
+    for k in ("captions", "title", "sticker", "overlays", "scenes"):
+        if k in sp:
+            walk(sp[k])
+    for b in sp.get("broll", []):
+        b["start"] = round(b["start"] / spd, 4)
+        b["dur"] = round(b["dur"] / spd, 4)
+        b["speed"] = b.get("speed", 1.0) * spd
+    sp["duration"] = round(sp["duration"] / spd, 4)
+    return sp
+
+
 # ------------------------------------------------------------------ final render
 def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = False) -> Path:
     """One ffmpeg pass. Memory stays ~constant (each input is decoded as a stream)."""
     if not spec.get("_snapped") and not spec.get("raw_cuts"):
         from .cutsafe import snap_voice
         snap_voice(spec, lambda k: _src(spec, k)); spec["_snapped"] = True
+    spd = float(spec.get("speed") or 1.0)
+    if spd != 1.0 and not spec.get("_sped"):
+        spec = _speed_timeline(spec, spd)
     W, H, FPS = spec["canvas"]["w"], spec["canvas"]["h"], spec["canvas"]["fps"]
     if preview:
         W, H = W // 2, H // 2
@@ -283,6 +313,8 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
     cx = int((sw - W) / 2 - ax * W / 2)
     cy = int((sh - H) / 2 + ay * H / 2)
     vlabels, alabels = [], []
+    mf = Path(spec["_base"]) / "mute.json"
+    mutes = json.loads(mf.read_text()) if mf.exists() else []
     from .audioclean import clean
     vsrc = {}  # talking clips with cleaned voice (denoise + -14 LUFS), cached in the job folder
     for key in {seg["src"] for seg in spec["voice"]}:
@@ -311,9 +343,20 @@ def render_reel(spec: dict, out: Path, quality: str = "high", preview: bool = Fa
             fc.append(f"[{i}:v]fps={FPS},scale={psw}:{psh}:force_original_aspect_ratio=increase:flags=lanczos,"
                       f"crop={psw}:{psh},crop={W}:{H}:{max(0, pcx)}:{max(0, pcy)},setsar=1"
                       f"{grade},format=yuv420p,setpts=PTS-STARTPTS[av{k}]")
+        if spd != 1.0:  # faster: picture by timestamps, voice by tempo (pitch stays)
+            fc[-1] = fc[-1].replace(f"setpts=PTS-STARTPTS[av{k}]", f"setpts=(PTS-STARTPTS)/{spd}[av{k}]")
+        if spd != 1.0 and f"setpts=(PTS-STARTPTS)/{spd}[av{k}]" not in fc[-1]:
+            fc[-1] = fc[-1].replace(f"setpts=PTS-STARTPTS[av{k}]", f"setpts=(PTS-STARTPTS)/{spd}[av{k}]")
         fd = min(0.012, seg["dur"] / 4)  # micro-fades: no clicks at cut points
-        fc.append(f"[{i}:a]aresample=48000,asetpts=PTS-STARTPTS,afade=t=in:d={fd:.3f},"
-                  f"afade=t=out:st={seg['dur'] - fd:.4f}:d={fd:.3f}[aa{k}]")
+        rng = []  # quiet.py: muted pauses (source time) that fall in this piece
+        for m in mutes:
+            if Path(m["src"]).name == Path(str(spec["sources"][seg["src"]])).name:
+                a, b = max(m["from"], seg["in"]) - seg["in"], min(m["to"], seg["in"] + seg["dur"]) - seg["in"]
+                if b - a > 0.02:
+                    rng.append((a, b))
+        duck = "".join(f",volume=0.03:enable='between(t,{a:.3f},{b:.3f})'" for a, b in rng)
+        fc.append(f"[{i}:a]aresample=48000,asetpts=PTS-STARTPTS{duck},afade=t=in:d={fd:.3f},"
+                  f"afade=t=out:st={seg['dur'] - fd:.4f}:d={fd:.3f}{f',atempo={spd}' if spd != 1.0 else ''}[aa{k}]")
         vlabels.append(f"[av{k}]")
         alabels.append(f"[aa{k}]")
     fc.append(f"{''.join(vlabels)}concat=n={len(vlabels)}:v=1:a=0[base]")
